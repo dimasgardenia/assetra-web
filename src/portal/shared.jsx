@@ -26,6 +26,7 @@ const PIcon = ({ name, size = 16, stroke = 1.7 }) => {
     case 'plus': return <svg {...p}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>;
     case 'arrowR': return <svg {...p}><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>;
     case 'chevD': return <svg {...p}><polyline points="6 9 12 15 18 9"/></svg>;
+    case 'menu': return <svg {...p}><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>;
     case 'chevR': return <svg {...p}><polyline points="9 18 15 12 9 6"/></svg>;
     case 'phone': return <svg {...p}><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg>;
     case 'chat': return <svg {...p}><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8z"/></svg>;
@@ -38,6 +39,8 @@ const PIcon = ({ name, size = 16, stroke = 1.7 }) => {
     case 'trend': return <svg {...p}><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>;
     case 'bolt': return <svg {...p}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>;
     case 'shield': return <svg {...p}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>;
+    case 'lock': return <svg {...p}><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>;
+    case 'gear': return <svg {...p}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>;
     case 'eye': return <svg {...p}><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>;
     case 'edit': return <svg {...p}><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4z"/></svg>;
     case 'megaphone': return <svg {...p}><path d="M3 11l18-5v12L3 14v-3zM3 11v3a2 2 0 0 0 2 2h1M11 17.5a2 2 0 0 1-4 0v-3.5"/></svg>;
@@ -62,6 +65,7 @@ const PortalNav = ({ active, lang, onLang, onNav }) => {
   const user = useUser();
   const actions = useActions();
   const [menuOpen, setMenuOpen] = React.useState(false);
+  const [mobileOpen, setMobileOpen] = React.useState(false);
   const menuRef = React.useRef(null);
   React.useEffect(() => {
     if (!menuOpen) return;
@@ -69,6 +73,17 @@ const PortalNav = ({ active, lang, onLang, onNav }) => {
     document.addEventListener('mousedown', close);
     return () => document.removeEventListener('mousedown', close);
   }, [menuOpen]);
+  const goMobile = (id) => { setMobileOpen(false); onNav && onNav(id); };
+  /* Deteksi "agen terverifikasi" (kartu 'live') untuk tombol Admin Panel. */
+  const [isLiveAgent, setIsLiveAgent] = React.useState(false);
+  React.useEffect(() => {
+    setIsLiveAgent(false);
+    if (!user || user.accountType !== 'agent' || !user.emailVerified) return;
+    let on = true;
+    api.get('/api/agents/me').then(r => { if (on && r.data?.status === 'live') setIsLiveAgent(true); }).catch(() => {});
+    return () => { on = false; };
+  }, [user?.id, user?.accountType, user?.emailVerified]);
+  const canAdmin = !!user && (user.role === 'admin' || isLiveAgent);
   const firstName = (user?.name || user?.email || '').split(/[\s@]/)[0];
   const initials = (user?.name || user?.email || '?').trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase();
   const links = [
@@ -117,10 +132,16 @@ const PortalNav = ({ active, lang, onLang, onNav }) => {
                       </div>
                     )}
                   </div>
-                  {user.role === 'admin' && (
+                  {/* Pengaturan — untuk semua user login (edit dibatasi bila belum verifikasi). */}
+                  <div onClick={() => { setMenuOpen(false); onNav && onNav('settings'); }} style={{ padding: '11px 15px', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 9, color: 'var(--ink-2)' }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'var(--paper-2)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                    <PIcon name="gear" size={15} /> {lang === 'id' ? 'Pengaturan' : 'Settings'}
+                  </div>
+                  {/* Admin Panel — admin atau agen terverifikasi. */}
+                  {canAdmin && (
                     <div onClick={() => { setMenuOpen(false); onNav && onNav('admin'); }} style={{ padding: '11px 15px', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 9, color: 'var(--ink-2)' }}
                       onMouseEnter={e => e.currentTarget.style.background = 'var(--paper-2)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                      <PIcon name="dash" size={15} /> {lang === 'id' ? 'Dasbor Admin' : 'Admin Dashboard'}
+                      <PIcon name="dash" size={15} /> {lang === 'id' ? 'Admin Panel' : 'Admin Panel'}
                     </div>
                   )}
                   <div onClick={() => { setMenuOpen(false); actions.logout(); onNav && onNav('home'); }} style={{ padding: '11px 15px', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 9, color: 'var(--red, #C14545)', borderTop: '1px solid var(--line-2)' }}
@@ -134,8 +155,24 @@ const PortalNav = ({ active, lang, onLang, onNav }) => {
             <button className="p-btn p-btn-ghost p-btn-sm" onClick={() => onNav && onNav('signin')}>{t('p.nav.signin')}</button>
           )}
           <button className="p-btn p-btn-cyan p-btn-sm" onClick={() => onNav && onNav('sell')}><PIcon name="plus" size={14} /> {t('p.nav.sell')}</button>
+          <button className="p-nav-burger" aria-label="Menu" onClick={() => setMobileOpen(v => !v)}><PIcon name={mobileOpen ? 'x' : 'menu'} size={20} /></button>
         </div>
       </div></nav>
+
+      {/* Menu ponsel — muncul di bawah navbar saat hamburger ditekan. */}
+      {mobileOpen && (
+        <div className="p-nav-mobile-panel" style={{ position: 'sticky', top: 0, zIndex: 39, background: '#fff', borderBottom: '1px solid var(--line)', boxShadow: '0 12px 30px rgba(10,22,64,0.1)' }}>
+          <div style={{ padding: '8px 16px 16px', display: 'flex', flexDirection: 'column' }}>
+            {links.map(l => (
+              <span key={l.id} onClick={() => goMobile(l.id)} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '13px 6px', fontSize: 15, fontWeight: 600, color: active === l.id ? 'var(--teal)' : 'var(--ink)', borderBottom: '1px solid var(--line-2)', cursor: 'pointer' }}>
+                {l.icon && <PIcon name={l.icon} size={16} />}{l.label}
+              </span>
+            ))}
+            <button className="p-btn p-btn-cyan" style={{ width: '100%', marginTop: 14 }} onClick={() => goMobile('sell')}><PIcon name="plus" size={15} /> {t('p.nav.sell')}</button>
+          </div>
+        </div>
+      )}
+      <style>{`.p-nav-mobile-panel { display: none } @media (max-width: 768px) { .p-nav-mobile-panel { display: block } }`}</style>
     </>
   );
 };

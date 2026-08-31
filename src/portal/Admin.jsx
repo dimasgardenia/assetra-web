@@ -8,6 +8,8 @@ import React from 'react';
 import { Logo2, Photo2 } from '../shared-v2';
 import { PIcon, fmtRp } from './shared';
 import { api, resolveFileUrl } from '../api/client';
+import { resizeToAvatarDataUrl } from '../lib/image';
+import AppDialog from './AppDialog';
 
 /* Admin form type → backend {type, mode} */
 const TY_MAP = {
@@ -19,43 +21,36 @@ const TY_MAP = {
   'New · Project':     { type: 'property',   mode: 'new' },
 };
 
-/* Sesi admin back-office TERPISAH dari sesi user publik.
-   Token demo-admin disimpan di sessionStorage sendiri dan dikirim sebagai
-   header Authorization eksplisit — TIDAK pernah menimpa localStorage
-   'assetra:token' milik user yang sedang login di situs publik. */
-let adminToken = null;
-try { adminToken = sessionStorage.getItem('assetra:admin-token') || null; } catch {}
-const adminHeaders = () => (adminToken ? { Authorization: `Bearer ${adminToken}` } : {});
-
+/* Panel dipakai oleh akun asli yang sudah lolos AdminGuard (admin atau agen
+   terverifikasi). Panggilan memakai token sesi user (localStorage) via `api`.
+   Tidak ada lagi auto-login kredensial demo. */
 export const adminApi = {
-  get: (p, opts) => api.get(p, { ...opts, headers: { ...opts?.headers, ...adminHeaders() } }),
-  post: (p, b, opts) => api.post(p, b, { ...opts, headers: { ...opts?.headers, ...adminHeaders() } }),
-  put: (p, b, opts) => api.put(p, b, { ...opts, headers: { ...opts?.headers, ...adminHeaders() } }),
-  del: (p, opts) => api.del(p, { ...opts, headers: { ...opts?.headers, ...adminHeaders() } }),
+  get: (p, opts) => api.get(p, opts),
+  post: (p, b, opts) => api.post(p, b, opts),
+  put: (p, b, opts) => api.put(p, b, opts),
+  del: (p, opts) => api.del(p, opts),
 };
 
-/* Jalankan panggilan admin; saat 401/403 auto-login akun demo admin
-   (disimpan terpisah) lalu coba sekali lagi. */
+/* Pembungkus tipis (dipertahankan agar pemanggil tak berubah). */
 async function apiAdmin(fn) {
-  try {
-    return await fn();
-  } catch (e) {
-    if (e && (e.status === 401 || e.status === 403)) {
-      const r = await api.post('/api/auth/login', { email: 'admin@assetra.co.id', password: 'admin123' });
-      if (r?.token) {
-        adminToken = r.token;
-        try { sessionStorage.setItem('assetra:admin-token', adminToken); } catch {}
-      }
-      return await fn();
-    }
-    throw e;
-  }
+  return fn();
 }
 
 const PortalAdmin = ({ lang, onLang, onNav }) => {
   const id = lang === 'id';
   const L = (en, idt) => (id ? idt : en);
   const [persona, setPersona] = React.useState('admin');
+
+  /* Badge sidebar dari data nyata (bukan angka statis). */
+  const [counts, setCounts] = React.useState(null);
+  React.useEffect(() => {
+    apiAdmin(() => adminApi.get('/api/admin/stats'))
+      .then(r => {
+        const s = r.data || {};
+        setCounts({ listings: s.portalListings ?? 0, ads: s.activeBanners ?? 0, leads: s.newLeads ?? 0, kpr: s.totalKpr ?? 0, agents: s.liveAgents ?? 0 });
+      })
+      .catch(() => {});
+  }, []);
 
   const PERSONAS = {
     admin:  { name: 'Rina Aditya',    init: 'RA', role: L('Super Admin', 'Super Admin'),    tag: 'ADMIN',  badge: 'var(--gold)' },
@@ -95,7 +90,8 @@ const PortalAdmin = ({ lang, onLang, onNav }) => {
   const switchPersona = (p) => { setPersona(p); setNav(defaultNav[p]); };
 
   const cur = PERSONAS[persona];
-  const navItems = NAV[persona];
+  /* Timpa badge statis dengan hitungan nyata bila sudah termuat. */
+  const navItems = NAV[persona].map(n => (counts && counts[n.id] != null ? { ...n, count: counts[n.id] } : n));
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '232px 1fr', minHeight: '100vh', fontFamily: 'var(--sans)', background: '#F4F2EC' }}>
@@ -183,39 +179,77 @@ const Th = ({ children, right }) => <th style={{ textAlign: right ? 'right' : 'l
 const Td = ({ children, right, mono, bold }) => <td style={{ padding: '13px 16px', textAlign: right ? 'right' : 'left', fontFamily: mono ? 'var(--mono)' : 'inherit', fontSize: mono ? 12 : 13, fontWeight: bold ? 600 : 400, color: 'var(--ink-2)' }}>{children}</td>;
 const Card = ({ children }) => <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 10, overflow: 'hidden' }}>{children}</div>;
 
-/* ── Dashboard (admin) ── */
-const AdmDash = ({ L }) => (
-  <>
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
-      <Kpi label={L('Ad revenue (MTD)', 'Pendapatan iklan (MTD)')} val="Rp 847 jt" delta="▲ 18.4% MoM" />
-      <Kpi label={L('Active listings', 'Listing aktif')} val="142" delta="▲ 8 this week" />
-      <Kpi label={L('Sponsored slots', 'Slot sponsor')} val="38" delta="24 advertisers" color="var(--muted)" />
-      <Kpi label={L('Ad fill rate', 'Tingkat isi iklan')} val="82%" delta="▲ 6pp" />
-    </div>
-    <PageHead title={L('Operations overview', 'Ikhtisar operasional')} sub={L('Platform health across listings, ads, leads & financing.', 'Kesehatan platform: listing, iklan, prospek & pembiayaan.')} />
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-      <Card>
-        <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--line)', fontFamily: 'var(--serif)', fontSize: 17 }}>{L('Recent activity', 'Aktivitas terbaru')}</div>
-        <div style={{ padding: 6 }}>
-          {[[L('New lead on Menteng Townhouse', 'Prospek baru Rumah Menteng'), '2m'], [L('KPR application submitted · BCA', 'Pengajuan KPR · BCA'), '14m'], [L('AI report generated · Kuningan office', 'Laporan AI · kantor Kuningan'), '38m'], [L('Featured campaign went live', 'Kampanye unggulan tayang'), '1h'], [L('New owner listing pending review', 'Listing pemilik menunggu tinjauan'), '2h']].map((r, i) => (
-            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '11px 12px', fontSize: 13, borderBottom: i < 4 ? '1px solid var(--line-2)' : 'none' }}><span>{r[0]}</span><span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--muted)' }}>{r[1]}</span></div>
-          ))}
-        </div>
-      </Card>
-      <Card>
-        <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--line)', fontFamily: 'var(--serif)', fontSize: 17 }}>{L('Revenue by channel', 'Pendapatan per channel')}</div>
-        <div style={{ padding: 18 }}>
-          {[[L('Featured listings', 'Listing unggulan'), 62, 'var(--teal)'], [L('Display ads', 'Iklan display'), 24, 'var(--gold)'], [L('Agent subscriptions', 'Langganan agen'), 10, 'var(--green)'], [L('Sponsored search', 'Sponsor pencarian'), 4, 'var(--ink-3)']].map((r, i) => (
-            <div key={i} style={{ marginBottom: 14 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, marginBottom: 5 }}><span>{r[0]}</span><span style={{ fontFamily: 'var(--mono)', fontWeight: 600 }}>{r[1]}%</span></div>
-              <div style={{ height: 7, background: 'var(--paper-2)', borderRadius: 4, overflow: 'hidden' }}><div style={{ width: r[1] + '%', height: '100%', background: r[2] }} /></div>
-            </div>
-          ))}
-        </div>
-      </Card>
-    </div>
-  </>
+/* Banner jujur untuk bagian yang datanya masih contoh (belum tersambung backend). */
+const DemoNotice = ({ L, note }) => (
+  <div style={{ display: 'flex', alignItems: 'center', gap: 9, background: 'rgba(212,160,23,0.10)', border: '1px solid rgba(212,160,23,0.35)', color: '#8a6d0b', borderRadius: 9, padding: '9px 13px', fontSize: 12.5, marginBottom: 16 }}>
+    <PIcon name="sparkle" size={14} />
+    <span>{note || L('Sample data — this section is illustrative and not yet connected to live data.', 'Data contoh — bagian ini bersifat ilustratif dan belum tersambung ke data langsung.')}</span>
+  </div>
 );
+
+/* ── Dashboard (admin) ── */
+/* "x menit lalu" relatif dari timestamp ms. */
+const timeAgo = (ms, L) => {
+  const s = Math.max(0, Math.floor((Date.now() - ms) / 1000));
+  if (s < 60) return L('just now', 'baru saja');
+  const m = Math.floor(s / 60); if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60); if (h < 24) return `${h}j`;
+  return `${Math.floor(h / 24)}h`;
+};
+
+const AdmDash = ({ L }) => {
+  const [s, setS] = React.useState(null);
+  const [loading, setLoading] = React.useState(true);
+  React.useEffect(() => {
+    apiAdmin(() => adminApi.get('/api/admin/stats'))
+      .then(r => setS(r.data || {}))
+      .catch(() => setS({}))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const leadTypes = s?.leadsByType || { whatsapp: 0, call: 0, survey: 0, ai: 0 };
+  const leadTotal = leadTypes.whatsapp + leadTypes.call + leadTypes.survey + leadTypes.ai;
+  const pct = (n) => leadTotal ? Math.round((n / leadTotal) * 100) : 0;
+  const recent = s?.recent || [];
+  const recLabel = (r) => r.kind === 'kpr'
+    ? L(`KPR application · ${r.sub || 'bank'}`, `Pengajuan KPR · ${r.sub || 'bank'}`)
+    : L(`New ${r.sub || 'lead'} lead${r.title ? ` · ${r.title}` : ''}`, `Prospek ${r.sub || 'baru'}${r.title ? ` · ${r.title}` : ''}`);
+
+  return (
+    <>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
+        <Kpi label={L('Portal listings', 'Listing portal')} val={loading ? '…' : String(s?.portalListings ?? 0)} delta={L('live on marketplace', 'tayang di marketplace')} color="var(--muted)" />
+        <Kpi label={L('New leads', 'Prospek baru')} val={loading ? '…' : String(s?.newLeads ?? 0)} delta={L(`${s?.totalLeads ?? 0} total`, `${s?.totalLeads ?? 0} total`)} />
+        <Kpi label={L('KPR applications', 'Pengajuan KPR')} val={loading ? '…' : String(s?.totalKpr ?? 0)} delta={L(`${s?.newKpr ?? 0} new`, `${s?.newKpr ?? 0} baru`)} />
+        <Kpi label={L('Active agents', 'Agen aktif')} val={loading ? '…' : String(s?.liveAgents ?? 0)} delta={L(`${s?.totalAgents ?? 0} total`, `${s?.totalAgents ?? 0} total`)} color="var(--muted)" />
+      </div>
+      <PageHead title={L('Operations overview', 'Ikhtisar operasional')} sub={L('Live platform data across listings, leads, financing & agents.', 'Data platform langsung: listing, prospek, pembiayaan & agen.')} />
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        <Card>
+          <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--line)', fontFamily: 'var(--serif)', fontSize: 17 }}>{L('Recent activity', 'Aktivitas terbaru')}</div>
+          <div style={{ padding: 6 }}>
+            {recent.length === 0 && <div style={{ padding: '18px 12px', fontSize: 13, color: 'var(--muted)' }}>{loading ? L('Loading…', 'Memuat…') : L('No activity yet — leads & KPR applications will appear here.', 'Belum ada aktivitas — prospek & pengajuan KPR akan muncul di sini.')}</div>}
+            {recent.map((r, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '11px 12px', fontSize: 13, borderBottom: i < recent.length - 1 ? '1px solid var(--line-2)' : 'none' }}><span>{recLabel(r)}</span><span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--muted)' }}>{timeAgo(r.created_at, L)}</span></div>
+            ))}
+          </div>
+        </Card>
+        <Card>
+          <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--line)', fontFamily: 'var(--serif)', fontSize: 17 }}>{L('Leads by channel', 'Prospek per saluran')}</div>
+          <div style={{ padding: 18 }}>
+            {leadTotal === 0 && <div style={{ fontSize: 13, color: 'var(--muted)' }}>{loading ? L('Loading…', 'Memuat…') : L('No leads captured yet.', 'Belum ada prospek yang tertangkap.')}</div>}
+            {leadTotal > 0 && [[L('WhatsApp', 'WhatsApp'), leadTypes.whatsapp, 'var(--teal)'], [L('Call', 'Telepon'), leadTypes.call, 'var(--gold)'], [L('Site survey', 'Survei lokasi'), leadTypes.survey, 'var(--green)'], [L('AI consultant', 'Konsultan AI'), leadTypes.ai, 'var(--ink-3)']].map((r, i) => (
+              <div key={i} style={{ marginBottom: 14 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, marginBottom: 5 }}><span>{r[0]}</span><span style={{ fontFamily: 'var(--mono)', fontWeight: 600 }}>{r[1]} · {pct(r[1])}%</span></div>
+                <div style={{ height: 7, background: 'var(--paper-2)', borderRadius: 4, overflow: 'hidden' }}><div style={{ width: pct(r[1]) + '%', height: '100%', background: r[2] }} /></div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
+    </>
+  );
+};
 
 /* ── Listings (admin scope=all, owner scope=owner) ── */
 const LISTING_TYPES = ['House · Sale', 'Apartment · Sale', 'Villa · Sale', 'Land · Sale', 'Commercial · Rent', 'New · Project'];
@@ -1124,57 +1158,101 @@ const AdmAds = ({ L }) => {
 };
 
 /* ── Leads / Prospek (admin + agent) ── */
+const LEAD_SRC = { whatsapp: () => 'WhatsApp', call: L => L('Call', 'Telepon'), survey: L => L('Site survey', 'Survei'), ai: L => L('AI consultant', 'Konsultan AI') };
 const AdmLeads = ({ L, persona }) => {
-  const leads = [
-    { name: 'Hendra Gunawan', prop: 'Menteng Heritage Townhouse', budget: 14_000_000_000, src: 'WhatsApp', when: '2m', st: 'hot' },
-    { name: 'Maria Tanuwijaya', prop: 'SCBD Sky Apartment 28F', budget: 5_500_000_000, src: 'Form', when: '22m', st: 'new' },
-    { name: 'PT Anugrah Jaya', prop: 'Kuningan Office Floor', budget: 2_200_000_000, src: 'Call', when: '1h', st: 'new' },
-    { name: 'Rudi Salim', prop: 'BSD Green Residence', budget: 1_900_000_000, src: 'WhatsApp', when: '3h', st: 'review' },
-    { name: 'Lina Wijaya', prop: 'Canggu Beachfront Villa', budget: 12_000_000_000, src: 'Form', when: '5h', st: 'review' },
-  ];
+  const [leads, setLeads] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+  const load = React.useCallback(() => {
+    setLoading(true);
+    apiAdmin(() => adminApi.get('/api/leads'))
+      .then(r => setLeads(r.data || []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+  React.useEffect(() => { load(); }, [load]);
+
+  const setStatus = (lead, st) => {
+    setLeads(q => q.map(x => x.id === lead.id ? { ...x, status: st } : x));
+    apiAdmin(() => adminApi.post(`/api/leads/${lead.id}/status`, { status: st })).catch(() => {});
+  };
+  const srcLabel = (t) => (LEAD_SRC[t] || LEAD_SRC.whatsapp)(L);
+  const stLabel = (st) => st === 'new' ? L('New', 'Baru') : st === 'contacted' ? L('Contacted', 'Dihubungi') : L('Closed', 'Selesai');
+  const dayStart = new Date(); dayStart.setHours(0, 0, 0, 0);
+  const today = leads.filter(l => l.createdAt >= dayStart.getTime()).length;
+  const openCount = leads.filter(l => l.status === 'new').length;
   return (
     <>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 22 }}>
-        <Kpi label={L('New leads (today)', 'Prospek baru (hari ini)')} val="9" delta="▲ 3 vs yest." />
-        <Kpi label={L('Hot leads', 'Prospek panas')} val="4" delta={L('Follow up now', 'Tindak lanjut')} color="var(--red)" />
-        <Kpi label={L('Conversion rate', 'Tingkat konversi')} val="6.2%" delta="▲ 0.8pp" />
-        <Kpi label={L('Avg. response', 'Rata-rata respons')} val="12 min" delta="▼ 4 min" />
+        <Kpi label={L('Total leads', 'Total prospek')} val={loading ? '…' : String(leads.length)} delta={L('all time', 'sepanjang waktu')} color="var(--muted)" />
+        <Kpi label={L('New (today)', 'Baru (hari ini)')} val={loading ? '…' : String(today)} delta={L('captured today', 'masuk hari ini')} />
+        <Kpi label={L('Awaiting follow-up', 'Menunggu tindak lanjut')} val={loading ? '…' : String(openCount)} delta={L('status: new', 'status: baru')} color="var(--red)" />
+        <Kpi label={L('Closed', 'Selesai')} val={loading ? '…' : String(leads.filter(l => l.status === 'closed').length)} delta={L('completed', 'tuntas')} color="var(--muted)" />
       </div>
-      <PageHead title={L('Leads', 'Prospek')} sub={persona === 'agent' ? L('Buyers assigned to you. Respond fast to convert.', 'Pembeli yang ditugaskan ke Anda. Respons cepat untuk konversi.') : L('All inbound buyer enquiries across listings.', 'Semua pertanyaan pembeli di seluruh listing.')} actions={<button className="p-btn p-btn-ghost p-btn-sm" onClick={() => downloadFile('assetra-leads.csv', '\uFEFFname,property,budget_idr,source,when,status\n' + leads.map(l => `"${l.name}","${l.prop}",${l.budget},${l.src},${l.when},${l.st}`).join('\n') + '\n', 'text/csv;charset=utf-8')}><PIcon name="globe" size={14} /> {L('Export', 'Ekspor')}</button>} />
+      <PageHead title={L('Leads', 'Prospek')} sub={persona === 'agent' ? L('Buyers assigned to you. Respond fast to convert.', 'Pembeli yang ditugaskan ke Anda. Respons cepat untuk konversi.') : L('Inbound enquiries auto-captured from contact buttons across the site.', 'Pertanyaan masuk yang tertangkap otomatis dari tombol kontak di seluruh situs.')} actions={<button className="p-btn p-btn-ghost p-btn-sm" onClick={() => downloadFile('assetra-leads.csv', '\uFEFFname,phone,property,source,status,created_at\n' + leads.map(l => `"${l.name || ''}","${l.phone || ''}","${l.listingTitle || ''}",${l.type},${l.status},${new Date(l.createdAt).toISOString()}`).join('\n') + '\n', 'text/csv;charset=utf-8')}><PIcon name="globe" size={14} /> {L('Export', 'Ekspor')}</button>} />
       <Card>
+        {leads.length === 0 ? (
+          <div style={{ padding: '28px 18px', fontSize: 13, color: 'var(--muted)', textAlign: 'center' }}>{loading ? L('Loading…', 'Memuat…') : L('No leads yet. When visitors tap WhatsApp / Call / Survey on a listing, they appear here.', 'Belum ada prospek. Saat pengunjung menekan WhatsApp / Telepon / Survei pada listing, mereka muncul di sini.')}</div>
+        ) : (
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead><tr style={{ background: 'var(--paper-2)' }}><Th>{L('Buyer', 'Pembeli')}</Th><Th>{L('Interested in', 'Tertarik pada')}</Th><Th right>{L('Budget', 'Anggaran')}</Th><Th>{L('Source', 'Sumber')}</Th><Th>{L('When', 'Kapan')}</Th><Th>Status</Th><Th right> </Th></tr></thead>
+          <thead><tr style={{ background: 'var(--paper-2)' }}><Th>{L('Buyer', 'Pembeli')}</Th><Th>{L('Interested in', 'Tertarik pada')}</Th><Th>{L('Source', 'Sumber')}</Th><Th>{L('When', 'Kapan')}</Th><Th>Status</Th><Th right> </Th></tr></thead>
           <tbody>
-            {leads.map((l, i) => (
-              <tr key={i} style={{ borderTop: '1px solid var(--line)' }}>
-                <Td><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><div style={{ width: 30, height: 30, borderRadius: '50%', background: 'var(--brand-gradient)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--mono)', fontSize: 10, fontWeight: 600 }}>{l.name.split(' ').map(w => w[0]).slice(0, 2).join('')}</div><span style={{ fontWeight: 600 }}>{l.name}</span></div></Td>
-                <Td>{l.prop}</Td>
-                <Td right mono bold>{fmtRp(l.budget)}</Td>
-                <Td>{l.src}</Td>
-                <Td mono>{l.when}</Td>
-                <Td><Pill tone={l.st}>{l.st === 'hot' ? '🔥 ' + L('Hot', 'Panas') : l.st === 'new' ? L('New', 'Baru') : L('Review', 'Tinjauan')}</Pill></Td>
-                <Td right><button className="p-btn p-btn-cyan p-btn-sm" onClick={() => window.open('https://wa.me/?text=' + encodeURIComponent(L(
-                  `Hello ${l.name}, this is Assetra following up on your enquiry about "${l.prop}". When would be a good time for a viewing?`,
-                  `Halo ${l.name}, kami dari Assetra menindaklanjuti minat Anda pada "${l.prop}". Kapan waktu yang pas untuk survei lokasi?`)), '_blank')}><PIcon name="chat" size={13} /> WA</button></Td>
+            {leads.map((l) => {
+              const nm = l.name || L('Anonymous', 'Anonim');
+              return (
+              <tr key={l.id} style={{ borderTop: '1px solid var(--line)' }}>
+                <Td><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><div style={{ width: 30, height: 30, borderRadius: '50%', background: 'var(--brand-gradient)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--mono)', fontSize: 10, fontWeight: 600 }}>{nm.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()}</div><div><div style={{ fontWeight: 600 }}>{nm}</div>{l.phone && <div style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--mono)' }}>{l.phone}</div>}</div></div></Td>
+                <Td>{l.listingTitle || '—'}</Td>
+                <Td>{srcLabel(l.type)}</Td>
+                <Td mono>{timeAgo(l.createdAt, L)}</Td>
+                <Td>
+                  <select value={l.status} onChange={e => setStatus(l, e.target.value)} style={{ fontSize: 12, padding: '4px 6px', borderRadius: 6, border: '1px solid var(--line)', background: '#fff', color: 'var(--ink)' }}>
+                    <option value="new">{stLabel('new')}</option>
+                    <option value="contacted">{stLabel('contacted')}</option>
+                    <option value="closed">{stLabel('closed')}</option>
+                  </select>
+                </Td>
+                <Td right><button className="p-btn p-btn-cyan p-btn-sm" onClick={() => window.open('https://wa.me/' + (l.phone ? l.phone.replace(/[^\d]/g, '') : '') + '?text=' + encodeURIComponent(L(
+                  `Hello${l.name ? ' ' + l.name : ''}, this is Assetra following up on your enquiry${l.listingTitle ? ` about "${l.listingTitle}"` : ''}. When would be a good time for a viewing?`,
+                  `Halo${l.name ? ' ' + l.name : ''}, kami dari Assetra menindaklanjuti minat Anda${l.listingTitle ? ` pada "${l.listingTitle}"` : ''}. Kapan waktu yang pas untuk survei lokasi?`)), '_blank')}><PIcon name="chat" size={13} /> WA</button></Td>
               </tr>
-            ))}
+            );})}
           </tbody>
         </table>
+        )}
       </Card>
     </>
   );
 };
 
 /* ── KPR Applications (admin + agent) ── */
+const DEMO_KPR = [
+  { name: 'Hendra Gunawan', prop: 'Menteng Townhouse', loan: 11_360_000_000, bank: 'Bank Mandiri', dp: '20%', st: 'review', phone: null, dbId: null },
+  { name: 'Maria Tanuwijaya', prop: 'SCBD Apartment', loan: 4_280_000_000, bank: 'BCA', dp: '20%', st: 'approved', phone: null, dbId: null },
+  { name: 'Rudi Salim', prop: 'BSD Residence', loan: 1_480_000_000, bank: 'BNI', dp: '20%', st: 'submitted', phone: null, dbId: null },
+];
+
 const AdmKpr = ({ L }) => {
-  const [apps, setApps] = React.useState([
-    { name: 'Hendra Gunawan', prop: 'Menteng Townhouse', loan: 11_360_000_000, bank: 'Bank Mandiri', dp: '20%', st: 'review' },
-    { name: 'Maria Tanuwijaya', prop: 'SCBD Apartment', loan: 4_280_000_000, bank: 'BCA', dp: '20%', st: 'approved' },
-    { name: 'Rudi Salim', prop: 'BSD Residence', loan: 1_480_000_000, bank: 'BNI', dp: '20%', st: 'submitted' },
-    { name: 'Lina Wijaya', prop: 'Canggu Villa', loan: 9_600_000_000, bank: 'CIMB Niaga', dp: '20%', st: 'review' },
-    { name: 'Toni Hartono', prop: 'Pondok Indah Home', loan: 7_840_000_000, bank: 'BRI', dp: '20%', st: 'rejected' },
-  ]);
+  const [apps, setApps] = React.useState(DEMO_KPR);
   const [sel, setSel] = React.useState(null); // index of app opened in detail modal
+
+  /* Muat pengajuan nyata dari database (di atas data demo). */
+  React.useEffect(() => {
+    apiAdmin(() => adminApi.get('/api/kpr')).then(r => {
+      const rows = (r.data || []).map(a => ({
+        dbId: a.id,
+        name: a.name,
+        phone: a.phone,
+        email: a.email,
+        income: a.income,
+        prop: a.propertyPrice ? `Simulasi ${fmtRp(a.propertyPrice)}` : 'Pra-persetujuan',
+        loan: a.loanAmount || 0,
+        bank: a.bank || 'Semua bank',
+        dp: a.propertyPrice && a.downPayment ? `${Math.round(a.downPayment / a.propertyPrice * 100)}%` : '—',
+        st: a.status,
+      }));
+      setApps([...rows, ...DEMO_KPR]);
+    }).catch(() => {});
+  }, []);
   const tone = { approved: 'live', review: 'review', submitted: 'new', rejected: 'hot' };
   const stLabel = (st) => st === 'approved' ? L('Approved', 'Disetujui') : st === 'review' ? L('Review', 'Tinjauan') : st === 'submitted' ? L('Submitted', 'Diajukan') : L('Rejected', 'Ditolak');
   return (
@@ -1215,7 +1293,13 @@ const AdmKpr = ({ L }) => {
               </div>
             ))}
             <FieldRow label="Status">
-              <select style={inputStyle} value={apps[sel].st} onChange={e => setApps(q => q.map((a, j) => j === sel ? { ...a, st: e.target.value } : a))}>
+              <select style={inputStyle} value={apps[sel].st} onChange={e => {
+                const st = e.target.value;
+                const cur = apps[sel];
+                setApps(q => q.map((a, j) => j === sel ? { ...a, st } : a));
+                /* Pengajuan nyata (punya dbId) → simpan status ke database. */
+                if (cur.dbId) apiAdmin(() => adminApi.post(`/api/kpr/${cur.dbId}/status`, { status: st })).catch(() => {});
+              }}>
                 {['submitted', 'review', 'approved', 'rejected'].map(s => <option key={s} value={s}>{stLabel(s)}</option>)}
               </select>
             </FieldRow>
@@ -1255,6 +1339,7 @@ const AdmAI = ({ L, persona }) => {
     'text/plain;charset=utf-8');
   return (
     <>
+      <DemoNotice L={L} note={L('Sample analyses — live AI reports are generated on the public AI Consultant page.', 'Analisis contoh — laporan AI langsung dibuat di halaman Konsultan AI publik.')} />
       <PageHead title={persona === 'owner' ? L('AI Consultant', 'Konsultan AI') : L('AI Reports', 'Laporan AI')} sub={persona === 'owner' ? L('Discover the highest-and-best use for your properties.', 'Temukan penggunaan terbaik untuk properti Anda.') : L('Highest-and-best-use analyses generated for clients.', 'Analisis penggunaan terbaik yang dibuat untuk klien.')} actions={<button className="p-btn p-btn-cyan p-btn-sm" onClick={() => setAsk(true)}><PIcon name="sparkle" size={14} /> {L('New analysis', 'Analisis baru')}</button>} />
       {/* AI prompt card */}
       <div style={{ background: 'linear-gradient(135deg, #0A1640, #14306B)', borderRadius: 12, padding: 22, color: '#fff', marginBottom: 22, display: 'flex', gap: 16, alignItems: 'center' }}>
@@ -1300,54 +1385,167 @@ const AdmAI = ({ L, persona }) => {
 };
 
 /* ── Agents (admin + agent) ── */
+/* Avatar agen: foto bila ada, jika tidak fallback inisial gradient. */
+const AgentAvatar = ({ name, photo, size = 44 }) => (
+  photo
+    ? <img src={photo} alt={name} style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', display: 'block', flexShrink: 0 }} />
+    : <div style={{ width: size, height: size, borderRadius: '50%', background: 'var(--brand-gradient)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--mono)', fontWeight: 600, flexShrink: 0 }}>{String(name || '?').split(' ').map(w => w[0]).slice(0, 2).join('')}</div>
+);
+
 const AdmAgents = ({ L, persona }) => {
-  const [agents, setAgents] = React.useState([
-    { name: 'Bagus Santoso', area: 'Jakarta Selatan', deals: 142, rating: 4.9, st: 'live' },
-    { name: 'Dewi Lestari', area: 'Menteng', deals: 98, rating: 4.8, st: 'live' },
-    { name: 'Putu Surya', area: 'Bali', deals: 76, rating: 4.9, st: 'live' },
-    { name: 'Sari Indah', area: 'Kuningan', deals: 54, rating: 4.6, st: 'review' },
-  ]);
-  const [open, setOpen] = React.useState(false);
-  const [f, setF] = React.useState({ name: '', area: '' });
-  const valid = f.name.trim() && f.area.trim();
-  const save = () => {
-    if (!valid) return;
-    setAgents(q => [...q, { name: f.name.trim(), area: f.area.trim(), deals: 0, rating: '—', st: 'review' }]);
-    setF({ name: '', area: '' });
-    setOpen(false);
+  const [agents, setAgents] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+  const [edit, setEdit] = React.useState(null); // agen yang sedang di-edit, {} = tambah baru, null = tutup
+  const [dialog, setDialog] = React.useState(null);
+  const dlgLang = L('en', 'id');
+  const canManage = persona === 'admin';
+
+  const load = React.useCallback(() => {
+    setLoading(true);
+    apiAdmin(() => adminApi.get('/api/agents/manage'))
+      .then(r => setAgents(r.data || []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+  React.useEffect(() => { load(); }, [load]);
+
+  const remove = (a) => {
+    setDialog({
+      icon: 'lock', danger: true,
+      title: L('Delete agent', 'Hapus agen'),
+      message: L(`Delete agent "${a.name}"? This cannot be undone.`, `Hapus agen "${a.name}"? Tindakan ini tidak dapat dibatalkan.`),
+      primary: L('Delete', 'Hapus'),
+      cancel: L('Cancel', 'Batal'),
+      onPrimary: async () => {
+        await apiAdmin(() => adminApi.del(`/api/agents/${a.id}`)).catch(() => {});
+        load();
+      },
+    });
   };
+
   return (
     <>
-      <PageHead title={L('Agents', 'Agen')} sub={persona === 'agent' ? L('Your team & territory performance.', 'Performa tim & teritori Anda.') : L('Field agents executing viewings, paperwork & negotiation.', 'Agen lapangan: survei, dokumen & negosiasi.')} actions={persona === 'admin' ? <button className="p-btn p-btn-primary p-btn-sm" onClick={() => setOpen(true)}><PIcon name="plus" size={14} /> {L('Add agent', 'Tambah agen')}</button> : null} />
+      <PageHead title={L('Agents', 'Agen')} sub={persona === 'agent' ? L('Your team & territory performance.', 'Performa tim & teritori Anda.') : L('Field agents executing viewings, paperwork & negotiation.', 'Agen lapangan: survei, dokumen & negosiasi.')} actions={canManage ? <button className="p-btn p-btn-primary p-btn-sm" onClick={() => setEdit({})}><PIcon name="plus" size={14} /> {L('Add agent', 'Tambah agen')}</button> : null} />
+      {loading && <div style={{ fontSize: 13, color: 'var(--muted)', padding: '8px 0' }}>{L('Loading…', 'Memuat…')}</div>}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
-        {agents.map((a, i) => (
-          <div key={i} style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 12, padding: 20 }}>
+        {agents.map((a) => (
+          <div key={a.id} style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 12, padding: 20, position: 'relative' }}>
+            {canManage && (
+              <div style={{ position: 'absolute', top: 12, right: 12, display: 'flex', gap: 6 }}>
+                <button onClick={() => setEdit(a)} title={L('Edit', 'Ubah')} style={{ width: 28, height: 28, borderRadius: 7, border: '1px solid var(--line)', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--teal)' }}><PIcon name="edit" size={13} /></button>
+                <button onClick={() => remove(a)} title={L('Delete', 'Hapus')} style={{ width: 28, height: 28, borderRadius: 7, border: '1px solid var(--line)', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--hot, #c0392b)' }}>✕</button>
+              </div>
+            )}
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
-              <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'var(--brand-gradient)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--mono)', fontWeight: 600 }}>{a.name.split(' ').map(w => w[0]).slice(0, 2).join('')}</div>
-              <div><div style={{ fontWeight: 700, fontSize: 14 }}>{a.name}</div><div style={{ fontSize: 11, color: 'var(--muted)' }}>{a.area}</div></div>
+              <AgentAvatar name={a.name} photo={a.photo} />
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontWeight: 700, fontSize: 14 }}>{a.name}</div>
+                <div style={{ fontSize: 11, color: 'var(--muted)' }}>{a.area || '—'}</div>
+                <div style={{ fontFamily: 'var(--mono)', fontSize: 9, letterSpacing: '0.06em', marginTop: 3, color: a.status === 'live' ? 'var(--green)' : 'var(--gold-2)' }}>{a.status === 'live' ? L('LIVE', 'AKTIF') : L('REVIEW', 'TINJAUAN')}</div>
+              </div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 12, borderTop: '1px solid var(--line)', fontSize: 12 }}>
               <div><div style={{ fontFamily: 'var(--serif)', fontSize: 20 }}>{a.deals}</div><div style={{ fontFamily: 'var(--mono)', fontSize: 9, color: 'var(--muted)', letterSpacing: '0.06em' }}>{L('DEALS', 'TRANSAKSI')}</div></div>
-              <div style={{ textAlign: 'right' }}><div style={{ fontFamily: 'var(--serif)', fontSize: 20, color: 'var(--gold-2)' }}>★ {a.rating}</div><div style={{ fontFamily: 'var(--mono)', fontSize: 9, color: 'var(--muted)', letterSpacing: '0.06em' }}>{L('RATING', 'PERINGKAT')}</div></div>
+              <div style={{ textAlign: 'right' }}><div style={{ fontFamily: 'var(--serif)', fontSize: 20, color: 'var(--gold-2)' }}>★ {a.rating ?? '—'}</div><div style={{ fontFamily: 'var(--mono)', fontSize: 9, color: 'var(--muted)', letterSpacing: '0.06em' }}>{L('RATING', 'PERINGKAT')}</div></div>
             </div>
           </div>
         ))}
       </div>
-      {open && (
-        <Modal title={L('Add Agent', 'Tambah Agen')} onClose={() => setOpen(false)}>
-          <FieldRow label={L('Full name *', 'Nama lengkap *')}>
-            <input style={inputStyle} value={f.name} onChange={e => setF({ ...f, name: e.target.value })} placeholder="cth. Andi Prasetyo" />
-          </FieldRow>
-          <FieldRow label={L('Territory / area *', 'Teritori / area *')}>
-            <input style={inputStyle} value={f.area} onChange={e => setF({ ...f, area: e.target.value })} placeholder="cth. Bandung" />
-          </FieldRow>
-          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 4 }}>
-            <button className="p-btn p-btn-ghost p-btn-sm" onClick={() => setOpen(false)}>{L('Cancel', 'Batal')}</button>
-            <button className="p-btn p-btn-primary p-btn-sm" disabled={!valid} style={!valid ? { opacity: 0.5, cursor: 'default' } : undefined} onClick={save}><PIcon name="check" size={14} /> {L('Add agent', 'Tambah agen')}</button>
-          </div>
-        </Modal>
-      )}
+      {edit && <AdmAgentForm L={L} agent={edit} onClose={() => setEdit(null)} onSaved={() => { setEdit(null); load(); }} />}
+      <AppDialog dialog={dialog} onClose={() => setDialog(null)} lang={dlgLang} />
     </>
+  );
+};
+
+/* Form tambah/ubah agen — termasuk unggah & ganti foto. */
+const AdmAgentForm = ({ L, agent, onClose, onSaved }) => {
+  const isNew = !agent.id;
+  const [f, setF] = React.useState({
+    name: agent.name || '', area: agent.area || '', phone: agent.phone || '',
+    status: agent.status || 'review', deals: agent.deals ?? 0, rating: agent.rating ?? '',
+  });
+  const [photo, setPhoto] = React.useState(agent.photo || null); // data URL atau null
+  const [busy, setBusy] = React.useState(false);
+  const [err, setErr] = React.useState('');
+  const fileRef = React.useRef(null);
+  const valid = f.name.trim();
+
+  const pickPhoto = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setErr('');
+    if (file.size > 5 * 1024 * 1024) { setErr(L('Photo is larger than 5 MB — please choose a smaller file.', 'Foto lebih dari 5 MB — pilih berkas yang lebih kecil.')); return; }
+    try {
+      const dataUrl = await resizeToAvatarDataUrl(file, 320);
+      setPhoto(dataUrl);
+    } catch (ex) { setErr(ex.message || L('Failed to read image', 'Gagal membaca gambar')); }
+  };
+
+  const submit = async () => {
+    if (!valid || busy) return;
+    setBusy(true); setErr('');
+    const body = {
+      name: f.name.trim(), area: f.area.trim() || null, phone: f.phone.trim() || null,
+      status: f.status, deals: Number(f.deals) || 0,
+      rating: f.rating === '' ? null : Number(f.rating),
+      photo, // data URL, atau null untuk hapus foto
+    };
+    try {
+      if (isNew) await apiAdmin(() => adminApi.post('/api/agents', body));
+      else await apiAdmin(() => adminApi.put(`/api/agents/${agent.id}`, body));
+      onSaved();
+    } catch (ex) {
+      setErr(ex?.message || L('Failed to save', 'Gagal menyimpan'));
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal title={isNew ? L('Add Agent', 'Tambah Agen') : L('Edit Agent', 'Ubah Agen')} onClose={onClose}>
+      {/* Foto */}
+      <FieldRow label={L('Photo', 'Foto')}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <AgentAvatar name={f.name} photo={photo} size={64} />
+          <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={pickPhoto} />
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="p-btn p-btn-ghost p-btn-sm" onClick={() => fileRef.current?.click()}>
+              <PIcon name="cam" size={14} /> {photo ? L('Change', 'Ganti') : L('Upload', 'Unggah')}
+            </button>
+            {photo && <button className="p-btn p-btn-ghost p-btn-sm" onClick={() => setPhoto(null)}>{L('Remove', 'Hapus')}</button>}
+          </div>
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6, lineHeight: 1.5 }}>{L('Recommended: square 1:1, at least 400×400px, face centered. JPG / PNG, max 5 MB — auto-cropped & resized to 320px.', 'Rekomendasi: kotak 1:1, minimal 400×400px, wajah di tengah. JPG / PNG, maks 5 MB — otomatis dipotong kotak & diperkecil ke 320px.')}</div>
+      </FieldRow>
+      <FieldRow label={L('Full name *', 'Nama lengkap *')}>
+        <input style={inputStyle} value={f.name} onChange={e => setF({ ...f, name: e.target.value })} placeholder="cth. Andi Prasetyo" />
+      </FieldRow>
+      <FieldRow label={L('Territory / area', 'Teritori / area')}>
+        <input style={inputStyle} value={f.area} onChange={e => setF({ ...f, area: e.target.value })} placeholder="cth. Bandung" />
+      </FieldRow>
+      <FieldRow label={L('WhatsApp / phone', 'WhatsApp / telepon')}>
+        <input style={inputStyle} value={f.phone} onChange={e => setF({ ...f, phone: e.target.value })} placeholder="cth. 08123456789" />
+      </FieldRow>
+      <div style={{ display: 'flex', gap: 12 }}>
+        <FieldRow label={L('Deals', 'Transaksi')}>
+          <input type="number" style={inputStyle} value={f.deals} onChange={e => setF({ ...f, deals: e.target.value })} />
+        </FieldRow>
+        <FieldRow label={L('Rating', 'Peringkat')}>
+          <input type="number" step="0.1" min="0" max="5" style={inputStyle} value={f.rating} onChange={e => setF({ ...f, rating: e.target.value })} placeholder="4.9" />
+        </FieldRow>
+      </div>
+      <FieldRow label={L('Status', 'Status')}>
+        <select style={inputStyle} value={f.status} onChange={e => setF({ ...f, status: e.target.value })}>
+          <option value="live">{L('Live (visible)', 'Aktif (tampil)')}</option>
+          <option value="review">{L('Review', 'Tinjauan')}</option>
+        </select>
+      </FieldRow>
+      {err && <div style={{ fontSize: 12, color: 'var(--hot, #c0392b)', marginBottom: 8 }}>{err}</div>}
+      <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 4 }}>
+        <button className="p-btn p-btn-ghost p-btn-sm" onClick={onClose}>{L('Cancel', 'Batal')}</button>
+        <button className="p-btn p-btn-primary p-btn-sm" disabled={!valid || busy} style={(!valid || busy) ? { opacity: 0.5, cursor: 'default' } : undefined} onClick={submit}><PIcon name="check" size={14} /> {busy ? L('Saving…', 'Menyimpan…') : (isNew ? L('Add agent', 'Tambah agen') : L('Save changes', 'Simpan perubahan'))}</button>
+      </div>
+    </Modal>
   );
 };
 
@@ -1391,6 +1589,7 @@ const AdmOwnerAds = ({ L }) => {
   ];
   return (
     <>
+      <DemoNotice L={L} />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 22 }}>
         <Kpi label={L('Total impressions', 'Total impresi')} val="223K" delta="▲ 14% this week" />
         <Kpi label={L('Total clicks', 'Total klik')} val="6,780" delta="▲ 9%" />
@@ -1507,6 +1706,7 @@ const AdmReports = ({ L, persona }) => {
 
   return (
     <>
+      <DemoNotice L={L} />
       <PageHead
         title={L('Reports', 'Laporan')}
         sub={L('Download any report as CSV. Schedule recurring exports to email.', 'Unduh laporan apa pun sebagai CSV. Jadwalkan ekspor berkala ke email.')}

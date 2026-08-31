@@ -4,16 +4,52 @@ import React from 'react';
 import { useT } from '../i18n';
 import { PIcon, PortalNav, PortalFooter } from './shared';
 import { api } from '../api/client';
+import { useUser } from '../store';
+import { useIsMobile } from '../lib/useIsMobile';
+import { renderRichText } from '../lib/richtext';
+import AppDialog from './AppDialog';
 
 const PortalAI = ({ lang, onLang, onNav }) => {
   const { t } = useT();
   const id = lang === 'id';
+  const isMobile = useIsMobile();
+  const user = useUser();
+  const isVerified = !!user && !!user.emailVerified;
+  const needsVerify = !!user && !user.emailVerified;
+  const [dialog, setDialog] = React.useState(null);
+  /* Prompt berbeda: belum masuk → ke login; sudah masuk tapi belum verifikasi → cek email. */
+  const gatePrompt = () => needsVerify
+    ? setDialog({ icon: 'lock', title: id ? 'Verifikasi email dulu' : 'Verify your email', message: id ? 'Cek kotak masuk Anda dan verifikasi email untuk membuka fitur ini.' : 'Check your inbox and verify your email to unlock this feature.' })
+    : setDialog({ icon: 'lock', title: id ? 'Perlu masuk dulu' : 'Sign in required', message: id ? 'Masuk atau daftar dulu untuk memakai fitur ini.' : 'Sign in or register first to use this feature.', primary: id ? 'Masuk / Daftar' : 'Sign in / Register', onPrimary: () => onNav && onNav('signin') });
+  /* Nomor kontak diambil dari server (endpoint wajib login+verifikasi) — tidak di-hardcode. */
+  const [contactPhone, setContactPhone] = React.useState(null);
+  React.useEffect(() => {
+    if (!isVerified) { setContactPhone(null); return; }
+    let alive = true;
+    api.get('/api/contact').then(r => { if (alive && r.data?.whatsapp) setContactPhone(r.data.whatsapp); }).catch(() => {});
+    return () => { alive = false; };
+  }, [isVerified]);
+  const openWA = (text) => {
+    /* Nomor WhatsApp admin hanya untuk pengguna terverifikasi. */
+    if (!isVerified) { gatePrompt(); return; }
+    if (!contactPhone) {
+      setDialog({ icon: 'chat', title: id ? 'Sebentar ya' : 'One moment', message: id ? 'Sedang memuat nomor kontak — coba lagi sebentar.' : 'Loading the contact number — please try again shortly.' });
+      return;
+    }
+    /* Catat prospek dari halaman Konsultan AI (best-effort). */
+    api.post('/api/leads', { type: 'ai', listingTitle: 'Konsultan AI', message: text.slice(0, 200) }).catch(() => {});
+    window.open(`https://wa.me/${contactPhone}?text=${encodeURIComponent(text)}`, '_blank', 'noopener');
+  };
   const [msgs, setMsgs] = React.useState([]);   // real conversation beyond the showcase
   const [input, setInput] = React.useState('');
   const [typing, setTyping] = React.useState(false);
   const bodyRef = React.useRef(null);
 
   const send = async () => {
+    if (!isVerified) {
+      gatePrompt();
+      return;
+    }
     const q = input.trim();
     if (!q || typing) return;
     const history = [
@@ -54,7 +90,7 @@ const PortalAI = ({ lang, onLang, onNav }) => {
         </div>
       </section>
 
-      <div className="pwrap" style={{ padding: '40px 32px 56px', display: 'grid', gridTemplateColumns: '1fr 380px', gap: 32, alignItems: 'flex-start' }}>
+      <div className="pwrap" style={{ padding: isMobile ? '28px 16px 40px' : '40px 32px 56px', display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 380px', gap: isMobile ? 20 : 32, alignItems: 'flex-start' }}>
         {/* Chat console */}
         <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 14, overflow: 'hidden', boxShadow: 'var(--p-card-shadow)' }}>
           <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'center', gap: 12, background: 'var(--ink)', color: '#fff' }}>
@@ -98,8 +134,8 @@ const PortalAI = ({ lang, onLang, onNav }) => {
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                  <button className="p-btn p-btn-cyan p-btn-sm"><PIcon name="doc" size={14} /> {id ? 'Laporan kelayakan' : 'Feasibility report'}</button>
-                  <button className="p-btn p-btn-ghost p-btn-sm"><PIcon name="users" size={14} /> {t('p.ai.cta2')}</button>
+                  <button className="p-btn p-btn-cyan p-btn-sm" onClick={() => openWA(id ? 'Halo Assetra, saya ingin meminta laporan kelayakan (feasibility) untuk properti saya. Bisa dibantu?' : 'Hi Assetra, I would like a feasibility report for my property. Can you help?')}><PIcon name="doc" size={14} /> {id ? 'Laporan kelayakan' : 'Feasibility report'}</button>
+                  <button className="p-btn p-btn-ghost p-btn-sm" onClick={() => openWA(id ? 'Halo Assetra, saya ingin dihubungkan dengan agen offline untuk konsultasi properti.' : 'Hi Assetra, I would like to be connected with an offline agent for a property consultation.')}><PIcon name="users" size={14} /> {t('p.ai.cta2')}</button>
                 </div>
               </div>
             </div>
@@ -111,12 +147,12 @@ const PortalAI = ({ lang, onLang, onNav }) => {
                   <div style={{ width: 30, height: 30, borderRadius: 8, background: 'var(--brand-gradient)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><PIcon name="sparkle" size={15} /></div>
                 )}
                 <div style={{
-                  padding: '12px 16px', fontSize: 14, lineHeight: 1.55, whiteSpace: 'pre-wrap',
+                  padding: '12px 16px', fontSize: 14, lineHeight: 1.55, whiteSpace: m.from === 'me' ? 'pre-wrap' : 'normal',
                   borderRadius: m.from === 'me' ? '14px 14px 4px 14px' : '4px 14px 14px 14px',
                   background: m.from === 'me' ? 'var(--ink)' : 'var(--paper-2)',
                   color: m.from === 'me' ? '#fff' : 'var(--ink-2)',
                   border: m.from === 'me' ? 'none' : '1px solid var(--line)',
-                }}>{m.text}</div>
+                }}>{m.from === 'me' ? m.text : renderRichText(m.text)}</div>
               </div>
             ))}
             {typing && (
@@ -130,6 +166,13 @@ const PortalAI = ({ lang, onLang, onNav }) => {
           </div>
 
           {/* input */}
+          {!isVerified ? (
+            <div style={{ padding: 16, borderTop: '1px solid var(--line)', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
+              <PIcon name="lock" size={16} />
+              <span style={{ fontSize: 13, color: 'var(--muted)' }}>{needsVerify ? (id ? 'Verifikasi email Anda untuk memakai Konsultan AI.' : 'Verify your email to use the AI Consultant.') : (id ? 'Masuk untuk memakai Konsultan AI.' : 'Sign in to use the AI Consultant.')}</span>
+              {!needsVerify && <button className="p-btn p-btn-cyan p-btn-sm" onClick={() => onNav && onNav('signin')}>{id ? 'Masuk / Daftar' : 'Sign in / Register'}</button>}
+            </div>
+          ) : (
           <div style={{ padding: 16, borderTop: '1px solid var(--line)', display: 'flex', gap: 10 }}>
             <input
               className="p-input"
@@ -141,6 +184,7 @@ const PortalAI = ({ lang, onLang, onNav }) => {
             />
             <button className="p-btn p-btn-cyan" onClick={send} disabled={typing || !input.trim()}><PIcon name="arrowR" size={16} /></button>
           </div>
+          )}
           <style>{`@keyframes aidot { 0%,100% { opacity:.3; transform:translateY(0);} 50% { opacity:1; transform:translateY(-3px);} }`}</style>
         </div>
 
@@ -173,13 +217,14 @@ const PortalAI = ({ lang, onLang, onNav }) => {
               <PIcon name="users" size={24} />
               <h3 style={{ fontFamily: 'var(--serif)', fontWeight: 500, fontSize: 20, margin: '12px 0 8px' }}>{id ? 'Didukung agen offline' : 'Backed by offline agents'}</h3>
               <p style={{ fontSize: 13, color: 'rgba(250,250,247,0.75)', lineHeight: 1.55, marginBottom: 16 }}>{id ? 'AI menyiapkan analisis, agen lapangan kami yang mengeksekusi: survei, izin, negosiasi, hingga notaris.' : 'The AI prepares the analysis; our field agents execute — surveys, permits, negotiation, and notary.'}</p>
-              <button className="p-btn p-btn-cyan" style={{ width: '100%' }}><PIcon name="phone" size={15} /> {t('p.ai.cta2')}</button>
+              <button className="p-btn p-btn-cyan" style={{ width: '100%' }} onClick={() => openWA(id ? 'Halo Assetra, saya ingin dihubungkan dengan agen offline untuk konsultasi properti.' : 'Hi Assetra, I would like to be connected with an offline agent for a property consultation.')}><PIcon name="phone" size={15} /> {t('p.ai.cta2')}</button>
             </div>
           </div>
         </aside>
       </div>
 
       <PortalFooter />
+      <AppDialog dialog={dialog} onClose={() => setDialog(null)} lang={lang} />
     </div>
   );
 };

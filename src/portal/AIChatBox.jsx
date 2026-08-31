@@ -4,9 +4,14 @@
 import React from 'react';
 import { PIcon } from './shared';
 import { api } from '../api/client';
+import { useUser } from '../store';
+import { renderRichText } from '../lib/richtext';
 
-const AIChatBox = ({ lang, property }) => {
+const AIChatBox = ({ lang, property, onNav }) => {
   const L = (en, id) => (lang === 'id' ? id : en);
+  const user = useUser();
+  const isVerified = !!user && !!user.emailVerified;
+  const needsVerify = !!user && !user.emailVerified;
   const [open, setOpen] = React.useState(true);
   const [msgs, setMsgs] = React.useState(() => [
     { from: 'ai', text: L(
@@ -50,9 +55,13 @@ const AIChatBox = ({ lang, property }) => {
     return hit ? hit.a : FALLBACK;
   };
 
+  const [quotaLeft, setQuotaLeft] = React.useState(null); // sisa token harian (null = belum tahu)
+  const quotaOut = quotaLeft === 0;
+
   const send = async (text) => {
+    if (!isVerified) { if (!needsVerify) onNav && onNav('signin'); return; }
     const q = (text || input).trim();
-    if (!q || typing) return;
+    if (!q || typing || quotaOut) return;
     const history = msgs;
     setMsgs(m => [...m, { from: 'me', text: q }]);
     setInput('');
@@ -65,6 +74,7 @@ const AIChatBox = ({ lang, property }) => {
         history: history.slice(-10).map(m => ({ role: m.from === 'me' ? 'user' : 'assistant', content: m.text })),
       });
       setMsgs(m => [...m, { from: 'ai', text: r.reply }]);
+      if (typeof r.remaining === 'number') setQuotaLeft(r.remaining);
     } catch {
       // Backend or API key unavailable — degrade to canned answers.
       await new Promise(res => setTimeout(res, 900));
@@ -108,8 +118,8 @@ const AIChatBox = ({ lang, property }) => {
                   background: m.from === 'me' ? 'var(--ink, #0A1640)' : '#fff',
                   color: m.from === 'me' ? '#fff' : 'var(--ink-2)',
                   border: m.from === 'me' ? 'none' : '1px solid var(--line)',
-                  whiteSpace: 'pre-wrap',
-                }}>{m.text}</div>
+                  whiteSpace: m.from === 'me' ? 'pre-wrap' : 'normal',
+                }}>{m.from === 'me' ? m.text : renderRichText(m.text)}</div>
               </div>
             ))}
             {typing && (
@@ -122,6 +132,16 @@ const AIChatBox = ({ lang, property }) => {
             )}
           </div>
 
+          {!isVerified ? (
+            /* Gerbang — fitur AI hanya untuk pengguna terverifikasi. */
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 9, textAlign: 'center', padding: '20px 18px 22px', background: 'var(--paper, #F4F6FB)' }}>
+              <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(26,111,168,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--teal)' }}><PIcon name="lock" size={18} /></div>
+              <div style={{ fontWeight: 700, fontSize: 13.5, color: 'var(--ink)' }}>{needsVerify ? L('Verify your email to use the AI', 'Verifikasi email untuk memakai AI') : L('Sign in to use the AI assistant', 'Masuk untuk memakai asisten AI')}</div>
+              <div style={{ fontSize: 12, color: 'var(--muted)', maxWidth: 280, lineHeight: 1.5 }}>{needsVerify ? L('Check your inbox and verify your email to unlock the AI assistant.', 'Cek kotak masuk dan verifikasi email Anda untuk membuka asisten AI.') : L('The AI property analysis is available to verified users only.', 'Analisis properti AI hanya tersedia untuk pengguna terverifikasi.')}</div>
+              {!needsVerify && <button className="p-btn p-btn-cyan p-btn-sm" style={{ marginTop: 2 }} onClick={() => onNav && onNav('signin')}>{L('Sign in / Register', 'Masuk / Daftar')}</button>}
+            </div>
+          ) : (
+          <>
           {/* suggestion chips */}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', padding: '12px 18px 4px', background: 'var(--paper, #F4F6FB)' }}>
             {CHIPS.map(c => (
@@ -133,20 +153,28 @@ const AIChatBox = ({ lang, property }) => {
           <div style={{ display: 'flex', gap: 10, padding: '12px 18px 16px', background: 'var(--paper, #F4F6FB)' }}>
             <input
               value={input}
+              disabled={quotaOut}
               onChange={e => setInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && send()}
-              placeholder={L('Ask about this property…', 'Tanya tentang properti ini…')}
-              style={{ flex: 1, height: 46, border: '1px solid var(--line)', borderRadius: 12, padding: '0 15px', fontSize: 13.5, fontFamily: 'var(--sans)', outline: 'none', background: '#fff', color: 'var(--ink)' }}
+              placeholder={quotaOut ? L('Daily AI quota used up — back tomorrow', 'Jatah AI harian habis — kembali besok') : L('Ask about this property…', 'Tanya tentang properti ini…')}
+              style={{ flex: 1, height: 46, border: '1px solid var(--line)', borderRadius: 12, padding: '0 15px', fontSize: 13.5, fontFamily: 'var(--sans)', outline: 'none', background: quotaOut ? '#EEF1F7' : '#fff', color: 'var(--ink)', cursor: quotaOut ? 'not-allowed' : 'text' }}
             />
-            <button onClick={() => send()} disabled={!input.trim()} style={{
-              width: 46, height: 46, borderRadius: 12, border: 'none', cursor: input.trim() ? 'pointer' : 'default',
-              background: input.trim() ? 'var(--brand-gradient)' : '#DCE2EF', color: '#fff',
+            <button onClick={() => send()} disabled={!input.trim() || quotaOut} style={{
+              width: 46, height: 46, borderRadius: 12, border: 'none', cursor: input.trim() && !quotaOut ? 'pointer' : 'default',
+              background: input.trim() && !quotaOut ? 'var(--brand-gradient)' : '#DCE2EF', color: '#fff',
               display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background .15s',
             }}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 2 11 13"></path><path d="M22 2 15 22l-4-9-9-4z"></path></svg>
             </button>
           </div>
+          {quotaLeft != null && !quotaOut && quotaLeft <= 40 && (
+            <div style={{ padding: '0 18px 12px', marginTop: -6, fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--mono)' }}>
+              {L(`AI quota left today: ${quotaLeft} tokens`, `Sisa jatah AI hari ini: ${quotaLeft} token`)}
+            </div>
+          )}
           <style>{`@keyframes aichatdot { 0%,100% { opacity:.3; transform:translateY(0);} 50% { opacity:1; transform:translateY(-3px);} }`}</style>
+          </>
+          )}
         </>
       )}
     </div>

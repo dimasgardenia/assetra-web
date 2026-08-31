@@ -24,6 +24,15 @@ export function resolveFileUrl(p) {
   return p;
 }
 
+/* ── Pelacak aktivitas jaringan global ──
+   Setiap request menaikkan penghitung; indikator loading global berlangganan
+   perubahan ini dan hanya muncul saat request tertunda (koneksi lambat). */
+let inflight = 0;
+const loadingListeners = new Set();
+function notifyLoading() { for (const fn of loadingListeners) { try { fn(inflight); } catch {} } }
+export function onLoadingChange(fn) { loadingListeners.add(fn); fn(inflight); return () => loadingListeners.delete(fn); }
+export function isLoading() { return inflight > 0; }
+
 async function parseJsonOrEmpty(res) {
   const ct = res.headers.get('content-type') || '';
   if (!ct.includes('application/json')) return null;
@@ -58,19 +67,24 @@ export async function request(path, { method = 'GET', body, headers = {}, json =
     }
   }
 
+  inflight += 1; notifyLoading();
   let res;
   try {
-    res = await fetch(url, init);
-  } catch (e) {
-    throw new ApiError(`Network error: ${e.message}`, 0);
-  }
+    try {
+      res = await fetch(url, init);
+    } catch (e) {
+      throw new ApiError(`Network error: ${e.message}`, 0);
+    }
 
-  const data = await parseJsonOrEmpty(res);
-  if (!res.ok) {
-    const msg = data?.error || `Request failed with ${res.status}`;
-    throw new ApiError(msg, res.status, data);
+    const data = await parseJsonOrEmpty(res);
+    if (!res.ok) {
+      const msg = data?.error || `Request failed with ${res.status}`;
+      throw new ApiError(msg, res.status, data);
+    }
+    return data;
+  } finally {
+    inflight = Math.max(0, inflight - 1); notifyLoading();
   }
-  return data;
 }
 
 export const api = {

@@ -2,8 +2,11 @@
 import React from 'react';
 import { useT } from '../i18n';
 import { PIcon, CatIcon, PortalNav, PortalFooter, PCard, AdSlot, PLISTINGS, PCATS, usePortalListings } from './shared';
+import LocationInput from './LocationInput';
+import { useIsMobile } from '../lib/useIsMobile';
 
 const PortalHome = ({ lang, onLang, onNav, listings }) => {
+  const isMobile = useIsMobile();
   const { t } = useT();
   const [tab, setTab] = React.useState('buy');
   /* hero search state → /search?q=&type=&max=&mode= */
@@ -15,6 +18,11 @@ const PortalHome = ({ lang, onLang, onNav, listings }) => {
   };
   const live = usePortalListings();          // DB listings (admin-created) + demo set
   const data = listings && listings.length ? listings : live;
+  /* Lokasi dari listing yang ada → ikut jadi saran autocomplete. */
+  const dbLocations = React.useMemo(
+    () => [...new Set(data.map(l => l.addr).filter(a => a && a !== '—'))],
+    [data],
+  );
   const featured = data.filter(l => l.featured || l.fromDb);
   const recent = data.slice(3, 7);
 
@@ -40,7 +48,14 @@ const PortalHome = ({ lang, onLang, onNav, listings }) => {
                 <PIcon name="pin" size={18} />
                 <div style={{ flex: 1 }}>
                   <label>{t('p.hero.loc')}</label>
-                  <input placeholder={t('p.hero.locPh')} value={q} onChange={e => setQ(e.target.value)} onKeyDown={e => e.key === 'Enter' && goSearch()} />
+                  <LocationInput
+                    value={q}
+                    onChange={setQ}
+                    onEnter={goSearch}
+                    onSelect={(loc) => onNav && onNav('search', { q: loc, type: typ, max: budget, mode: tab === 'buy' ? 'sale' : tab })}
+                    extra={dbLocations}
+                    placeholder={t('p.hero.locPh')}
+                  />
                 </div>
               </div>
               <div className="p-search-field">
@@ -118,7 +133,7 @@ const PortalHome = ({ lang, onLang, onNav, listings }) => {
 
       {/* AI Consultant teaser */}
       <section className="pwrap" style={{ paddingBottom: 56 }}>
-        <div className="p-ai" style={{ padding: '40px 44px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 44, alignItems: 'center' }}>
+        <div className="p-ai" style={{ padding: isMobile ? '28px 22px' : '40px 44px', display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: isMobile ? 24 : 44, alignItems: 'center' }}>
           <div style={{ position: 'relative' }}>
             <div className="p-ai-badge"><PIcon name="sparkle" size={12} /> {t('p.ai.eyebrow')}</div>
             <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 500, fontSize: 36, letterSpacing: '-0.02em', margin: '18px 0 14px', lineHeight: 1.1 }}>{t('p.ai.title')}</h2>
@@ -160,11 +175,11 @@ const PortalHome = ({ lang, onLang, onNav, listings }) => {
           <div><div className="p-eyebrow">{t('p.recent.eyebrow')}</div><h2 className="p-section-title">{t('p.recent.title')}</h2></div>
           <span className="p-link" onClick={() => onNav && onNav('search')}>{t('p.recent.all')} <PIcon name="arrowR" size={14} /></span>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 22 }}>
-          <div className="p-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 300px', gap: 22 }}>
+          <div className="p-grid">
             {recent.slice(0, 3).map(l => <PCard key={l.id} l={l} onNav={onNav} />)}
           </div>
-          <AdSlot variant="box" bank="mandiri" placement="home-box" style={{ minHeight: 380 }} />
+          {!isMobile && <AdSlot variant="box" bank="mandiri" placement="home-box" style={{ minHeight: 380 }} />}
         </div>
       </section>
 
@@ -174,7 +189,7 @@ const PortalHome = ({ lang, onLang, onNav, listings }) => {
           <div className="p-section-head">
             <div><div className="p-eyebrow">{t('p.fin.eyebrow')}</div><h2 className="p-section-title">{t('p.fin.title')}</h2><div className="p-section-sub">{t('p.fin.sub')}</div></div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: 16 }}>
             {[{ ic: 'calc', k: 'p.fin.calc' }, { ic: 'bank', k: 'p.fin.kpr' }, { ic: 'cash', k: 'p.fin.cash' }, { ic: 'doc', k: 'p.fin.plan' }].map(f => (
               <div key={f.k} onClick={() => onNav && onNav('finance')} style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 8, padding: 22, cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <div style={{ width: 44, height: 44, borderRadius: 10, background: 'rgba(26,111,168,0.1)', color: 'var(--teal)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><PIcon name={f.ic} size={22} /></div>
@@ -188,7 +203,7 @@ const PortalHome = ({ lang, onLang, onNav, listings }) => {
 
       {/* Sell / advertise CTA */}
       <section className="pwrap p-section">
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 22 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 22 }}>
           <div style={{ background: 'var(--ink)', color: '#fff', borderRadius: 12, padding: '36px 38px', position: 'relative', overflow: 'hidden' }}>
             <PIcon name="home" size={28} />
             <h3 style={{ fontFamily: 'var(--serif)', fontWeight: 500, fontSize: 26, margin: '14px 0 10px' }}>{t('p.sell.title')}</h3>

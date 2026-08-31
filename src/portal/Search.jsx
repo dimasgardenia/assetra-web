@@ -3,6 +3,8 @@ import React from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useT } from '../i18n';
 import { PIcon, fmtRp, PortalNav, PortalFooter, PCard, AdSlot, PLISTINGS, usePortalListings } from './shared';
+import LocationInput from './LocationInput';
+import { useIsMobile } from '../lib/useIsMobile';
 
 const PER_PAGE = 9;
 
@@ -16,10 +18,16 @@ const toNum = (s) => {
 const PortalSearch = ({ lang, onLang, onNav, listings }) => {
   const { t } = useT();
   const L = (en, id) => (lang === 'id' ? id : en);
+  const isMobile = useIsMobile();
+  const [filtersOpen, setFiltersOpen] = React.useState(false);
   const [params] = useSearchParams();
   const [view, setView] = React.useState('list');
   const live = usePortalListings();          // DB listings (admin-created) + demo set
   const all = listings && listings.length ? listings : live;
+  const dbLocations = React.useMemo(
+    () => [...new Set(all.map(l => l.addr).filter(a => a && a !== '—'))],
+    [all],
+  );
 
   /* ── filter state (seeded from URL: ?q=&type=&max=&mode=) ── */
   const [q, setQ] = React.useState(params.get('q') || '');
@@ -91,8 +99,8 @@ const PortalSearch = ({ lang, onLang, onNav, listings }) => {
   /* Rendered via {renderFilters()} (not <Component/>) so typing in the
      inputs doesn't remount the subtree and steal focus. */
   const renderFilters = () => (
-    <aside style={{ width: 260, flexShrink: 0 }}>
-      <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 8, padding: 20, position: 'sticky', top: 80 }}>
+    <aside style={{ width: isMobile ? '100%' : 260, flexShrink: 0 }}>
+      <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 8, padding: 20, position: isMobile ? 'static' : 'sticky', top: 80 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
           <h3 style={{ fontFamily: 'var(--serif)', fontSize: 18, margin: 0 }}>{t('p.search.filters')}</h3>
           <span className="p-link" style={{ fontSize: 12, cursor: 'pointer' }} onClick={reset}>{t('p.search.reset')}</span>
@@ -159,18 +167,20 @@ const PortalSearch = ({ lang, onLang, onNav, listings }) => {
 
   return (
     <div className="pscreen">
-      <PortalNav active="buy" lang={lang} onLang={onLang} onNav={onNav} />
+      {/* garis aktif navbar mengikuti mode: sale→Dijual, rent→Disewa, new→Properti Baru */}
+      <PortalNav active={mode === 'rent' ? 'rent' : mode === 'new' ? 'new' : 'buy'} lang={lang} onLang={onLang} onNav={onNav} />
 
       {/* search bar strip */}
       <div style={{ background: '#fff', borderBottom: '1px solid var(--line)', position: 'sticky', top: 61, zIndex: 30 }}>
         <div className="pwrap" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 0' }}>
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10, border: '1px solid var(--ink)', borderRadius: 8, padding: '10px 14px' }}>
             <PIcon name="search" size={16} />
-            <input
-              style={{ flex: 1, border: 'none', outline: 'none', fontFamily: 'var(--sans)', fontSize: 14, fontWeight: 500, background: 'transparent' }}
-              placeholder={L('Search location, title, or listing ID…', 'Cari lokasi, judul, atau ID listing…')}
+            <LocationInput
               value={q}
-              onChange={e => { setQ(e.target.value); setPage(1); }}
+              onChange={(v) => { setQ(v); setPage(1); }}
+              extra={dbLocations}
+              placeholder={L('Search location, title, or listing ID…', 'Cari lokasi, judul, atau ID listing…')}
+              inputStyle={{ width: '100%', border: 'none', outline: 'none', fontFamily: 'var(--sans)', fontSize: 14, fontWeight: 500, background: 'transparent' }}
             />
             {q && <span onClick={() => { setQ(''); setPage(1); }} style={{ cursor: 'pointer', color: 'var(--muted)', fontSize: 14 }}>✕</span>}
           </div>
@@ -181,8 +191,15 @@ const PortalSearch = ({ lang, onLang, onNav, listings }) => {
         </div>
       </div>
 
-      <div className="pwrap" style={{ display: 'flex', gap: 24, padding: '24px 32px 56px' }}>
-        {renderFilters()}
+      <div className="pwrap" style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 14 : 24, padding: isMobile ? '16px 16px 40px' : '24px 32px 56px' }}>
+        {isMobile ? (
+          <>
+            <button className="p-btn p-btn-ghost" style={{ width: '100%', justifyContent: 'center' }} onClick={() => setFiltersOpen(v => !v)}>
+              <PIcon name={filtersOpen ? 'x' : 'menu'} size={16} /> {filtersOpen ? L('Hide filters', 'Sembunyikan filter') : L('Filters & sort', 'Filter & urutkan')}
+            </button>
+            {filtersOpen && renderFilters()}
+          </>
+        ) : renderFilters()}
 
         <main style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
@@ -212,7 +229,7 @@ const PortalSearch = ({ lang, onLang, onNav, listings }) => {
             <>
               <div style={{ marginBottom: 20 }}>
                 <div style={{ fontFamily: 'var(--mono)', fontSize: 10, letterSpacing: '0.1em', color: 'var(--gold-2)', textTransform: 'uppercase', marginBottom: 10 }}>★ Sponsored results</div>
-                <div className="p-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+                <div className="p-grid">
                   {sponsored.map(l => <PCard key={l.id} l={l} onNav={onNav} />)}
                 </div>
               </div>
@@ -221,7 +238,7 @@ const PortalSearch = ({ lang, onLang, onNav, listings }) => {
           )}
 
           {pageRows.length > 0 ? (
-            <div className="p-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+            <div className="p-grid">
               {pageRows.map(l => <PCard key={l.id} l={l} onNav={onNav} />)}
             </div>
           ) : sponsored.length === 0 && (

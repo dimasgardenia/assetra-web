@@ -253,3 +253,55 @@
 .p-input { width: 100%; border: 1px solid var(--line); background: #fff; border-radius: var(--p-radius); padding: 11px 13px; font-family: var(--sans); font-size: 14px; color: var(--ink); outline: none; }
 .p-input:focus { border-color: var(--teal); box-shadow: 0 0 0 3px rgba(26,111,168,0.1); }
 .p-divider { height: 1px; background: var(--line); border: none; margin: 0; }
+
+/* ══════════════════════════════════════════════════════════════
+   Responsif — halaman publik (panel admin dikecualikan).
+   Tablet ≤ 900px, ponsel ≤ 768px, ponsel kecil ≤ 480px.
+   ══════════════════════════════════════════════════════════════ */
+
+/* Tombol hamburger hanya tampil di layar sempit. */
+.p-nav-burger { display: none; background: transparent; border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px; cursor: pointer; color: var(--ink); }
+.p-nav-mobile { display: none; }
+
+@media (max-width: 900px) {
+  .p-grid { grid-template-columns: repeat(2, 1fr); gap: 16px; }
+  .p-grid-4 { grid-template-columns: repeat(2, 1fr); }
+  .p-footer-grid { grid-template-columns: 1fr 1fr; gap: 24px; }
+}
+
+@media (max-width: 768px) {
+  .pwrap { padding: 0 16px; }
+  .p-util-inner { padding: 7px 16px; }
+  .p-util-links { gap: 12px; }
+  .p-nav-inner { padding: 12px 16px; gap: 12px; }
+
+  /* Link inline & CTA "Pasang iklan" disembunyikan → pindah ke menu hamburger. */
+  .p-nav-links { display: none; }
+  .p-nav-burger { display: inline-flex; align-items: center; justify-content: center; }
+  .p-nav-cta .p-btn-cyan { display: none; }
+
+  .p-section { padding: 36px 16px; }
+  .p-hero { padding: 40px 0 48px; }
+  .p-hero h1 { font-size: 34px; }
+  .p-hero p { font-size: 15px; }
+  .p-hero-stats { gap: 24px; flex-wrap: wrap; padding: 20px 0 24px; }
+  .p-hero-stat-n { font-size: 24px; }
+
+  /* Kotak pencarian: baris field jadi bertumpuk. */
+  .p-search-row { flex-direction: column; gap: 4px; padding: 10px; }
+  .p-search-field { padding: 10px 12px; }
+  .p-search-field + .p-search-field { border-left: none; border-top: 1px solid var(--line); }
+  .p-search-go { padding: 13px; width: 100%; justify-content: center; margin-top: 4px; }
+  .p-search-tabs { overflow-x: auto; }
+
+  .p-footer { padding: 40px 0 24px; }
+  .p-footer-grid { grid-template-columns: 1fr 1fr; }
+  .p-footer-bottom { flex-direction: column; gap: 8px; text-align: center; }
+}
+
+@media (max-width: 480px) {
+  .p-grid, .p-grid-4 { grid-template-columns: 1fr; }
+  .p-footer-grid { grid-template-columns: 1fr; gap: 20px; }
+  .p-hero h1 { font-size: 28px; }
+  .p-section { padding: 28px 16px; }
+}

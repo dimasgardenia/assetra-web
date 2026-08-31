@@ -7,9 +7,12 @@ import { PIcon } from './shared';
 import { useActions, useUser } from '../store';
 import { api, setToken } from '../api/client';
 import { signInWithGoogle } from '../sso';
+import { resizeToAvatarDataUrl } from '../lib/image';
+import { useIsMobile } from '../lib/useIsMobile';
 
 const PortalAuth = ({ lang, onNav }) => {
   const { t } = useT();
+  const isMobile = useIsMobile();
   const L = (en, id) => (lang === 'id' ? id : en);
   const actions = useActions();
   const { pathname, search } = useLocation();
@@ -36,8 +39,21 @@ const PortalAuth = ({ lang, onNav }) => {
     }
   }, [currentUser, mode]); // eslint-disable-line react-hooks/exhaustive-deps
   const [showPw, setShowPw] = React.useState(false);
-  const [role, setRole] = React.useState('buyer'); // buyer | owner
+  const [role, setRole] = React.useState('buyer'); // buyer | owner | agent
   const [name, setName] = React.useState('');
+  /* Registrasi agen: foto + area (hanya saat role === 'agent'). */
+  const [agentPhoto, setAgentPhoto] = React.useState(null); // data URL
+  const [agentArea, setAgentArea] = React.useState('');
+  const [photoErr, setPhotoErr] = React.useState('');
+  const agentPhotoRef = React.useRef(null);
+  const pickAgentPhoto = async (e) => {
+    const file = e.target.files?.[0]; e.target.value = '';
+    if (!file) return;
+    setPhotoErr('');
+    if (file.size > 5 * 1024 * 1024) { setPhotoErr(L('Photo is larger than 5 MB — please choose a smaller file.', 'Foto lebih dari 5 MB — pilih berkas yang lebih kecil.')); return; }
+    try { setAgentPhoto(await resizeToAvatarDataUrl(file, 320)); }
+    catch (ex) { setPhotoErr(ex.message || 'Gagal membaca gambar'); }
+  };
   const [email, setEmail] = React.useState('');
   const [phoneNum, setPhoneNum] = React.useState('');
   const [password, setPassword] = React.useState('');
@@ -192,6 +208,19 @@ const PortalAuth = ({ lang, onNav }) => {
           return;
         }
         const r = await actions.register({ email, password, name: name || email.split('@')[0], accountType: role, phone: phoneNum.trim() });
+        /* Pendaftaran agen: kirim profil agen (foto/area) untuk ditinjau admin.
+           Best-effort — kegagalan di sini tidak boleh menggagalkan pembuatan akun. */
+        if (role === 'agent') {
+          try {
+            await api.post('/api/agents/apply', {
+              name: name || email.split('@')[0],
+              area: agentArea.trim() || null,
+              phone: phoneNum.trim() || null,
+              email: email.trim().toLowerCase(),
+              photo: agentPhoto,
+            });
+          } catch (ex) { /* diamkan; akun tetap dibuat */ }
+        }
         if (r?.pendingVerification) {
           /* Gerbang verifikasi: tampilkan halaman "Cek email Anda". */
           setDemoVerifyToken(r.demo?.verifyToken || '');
@@ -240,10 +269,10 @@ const PortalAuth = ({ lang, onNav }) => {
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'grid', gridTemplateColumns: '1fr 1.05fr', background: '#fff', fontFamily: 'var(--sans)' }}>
+    <div style={{ minHeight: '100vh', display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1.05fr', background: '#fff', fontFamily: 'var(--sans)' }}>
 
-      {/* ── Left: brand panel ── */}
-      <div style={{ position: 'relative', background: 'radial-gradient(130% 110% at 15% 10%, #17275e 0%, #0A1640 60%)', color: '#fff', display: 'flex', flexDirection: 'column', padding: '44px 52px', overflow: 'hidden' }}>
+      {/* ── Left: brand panel (disembunyikan di ponsel) ── */}
+      <div style={{ display: isMobile ? 'none' : 'flex', position: 'relative', background: 'radial-gradient(130% 110% at 15% 10%, #17275e 0%, #0A1640 60%)', color: '#fff', flexDirection: 'column', padding: '44px 52px', overflow: 'hidden' }}>
         {/* decorative grid */}
         <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0.14 }} aria-hidden="true">
           <defs><pattern id="authgrid" width="44" height="44" patternUnits="userSpaceOnUse"><path d="M44 0H0V44" fill="none" stroke="#3BC4D9" strokeWidth="0.6" /></pattern></defs>
@@ -337,10 +366,12 @@ const PortalAuth = ({ lang, onNav }) => {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   {[
                     { id: 'buyer', ic: 'search', t: L('Buyer / Renter', 'Pembeli / Penyewa'), s: L('Browse, save & enquire on listings', 'Cari, simpan & tanya listing') },
-                    { id: 'owner', ic: 'home', t: L('Owner / Agent', 'Pemilik / Agen'), s: L('List & manage properties from a dashboard', 'Pasang & kelola properti lewat dasbor') },
+                    { id: 'owner', ic: 'home', t: L('Property Owner', 'Pemilik Properti'), s: L('List & manage properties from a dashboard', 'Pasang & kelola properti lewat dasbor') },
+                    { id: 'agent', ic: 'users', t: L('Agent', 'Agen'), s: L('Get a public agent profile with your photo', 'Dapatkan profil agen publik dengan foto Anda') },
                   ].map(r => (
                     <button key={r.id} onClick={() => setRole(r.id)} style={{
                       textAlign: 'left', padding: '14px 14px 12px', borderRadius: 12, cursor: 'pointer',
+                      gridColumn: r.id === 'agent' ? '1 / -1' : undefined,
                       border: role === r.id ? '2px solid var(--teal)' : '1px solid var(--line)',
                       background: role === r.id ? 'rgba(59,196,217,0.07)' : '#fff',
                       fontFamily: 'var(--sans)', position: 'relative', transition: 'all .15s',
@@ -361,9 +392,41 @@ const PortalAuth = ({ lang, onNav }) => {
                 <p style={{ fontSize: 11.5, color: 'var(--muted)', lineHeight: 1.5, margin: '9px 2px 0' }}>
                   {role === 'owner'
                     ? L('You’ll get a dashboard to create listings one by one or bulk-upload, plus ad performance & reports.', 'Anda mendapat dasbor untuk membuat listing satu per satu atau unggah massal, plus performa iklan & laporan.')
+                    : role === 'agent'
+                    ? L('Your agent profile (photo, name & area) is submitted for review, then shown on your listings.', 'Profil agen Anda (foto, nama & area) dikirim untuk ditinjau, lalu tampil di listing Anda.')
                     : L('Browse everything freely — no dashboard needed. You can upgrade to an owner account anytime.', 'Jelajahi semua dengan bebas — tanpa dasbor. Anda bisa upgrade ke akun pemilik kapan saja.')}
                 </p>
               </div>
+
+              {/* Foto & area — hanya untuk pendaftaran agen */}
+              {role === 'agent' && (
+                <>
+                  <div style={field}>
+                    <label style={labelS}>{L('Agent photo', 'Foto agen')}</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                      {agentPhoto
+                        ? <img src={agentPhoto} alt="" style={{ width: 60, height: 60, borderRadius: '50%', objectFit: 'cover', display: 'block', flexShrink: 0 }} />
+                        : <div style={{ width: 60, height: 60, borderRadius: '50%', background: 'var(--brand-gradient, linear-gradient(135deg,#1A6FA8,#3BC4D9))', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><PIcon name="users" size={22} /></div>}
+                      <input ref={agentPhotoRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={pickAgentPhoto} />
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button type="button" onClick={() => agentPhotoRef.current?.click()} style={{ padding: '9px 14px', borderRadius: 9, border: '1px solid var(--line)', background: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: 'var(--teal)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <PIcon name="cam" size={15} /> {agentPhoto ? L('Change', 'Ganti') : L('Upload photo', 'Unggah foto')}
+                        </button>
+                        {agentPhoto && <button type="button" onClick={() => setAgentPhoto(null)} style={{ padding: '9px 12px', borderRadius: 9, border: '1px solid var(--line)', background: '#fff', cursor: 'pointer', fontSize: 13, color: 'var(--muted)' }}>{L('Remove', 'Hapus')}</button>}
+                      </div>
+                    </div>
+                    {photoErr && <span style={{ fontSize: 11.5, color: 'var(--hot, #c0392b)' }}>{photoErr}</span>}
+                    <span style={{ fontSize: 11.5, color: 'var(--muted)', lineHeight: 1.5 }}>
+                      {L('Recommended: square 1:1, at least 400×400px, face centered. JPG / PNG, max 5 MB — auto-cropped & resized to 320px.',
+                         'Rekomendasi: kotak 1:1, minimal 400×400px, wajah di tengah. JPG / PNG, maks 5 MB — otomatis dipotong kotak & diperkecil ke 320px.')}
+                    </span>
+                  </div>
+                  <div style={field}>
+                    <label style={labelS}>{L('Territory / area', 'Teritori / area')}</label>
+                    <input style={inputS} placeholder={L('e.g. Jakarta Selatan', 'cth. Jakarta Selatan')} value={agentArea} onChange={e => setAgentArea(e.target.value)} />
+                  </div>
+                </>
+              )}
               <div style={field}>
                 <label style={labelS}>{L('Full name', 'Nama lengkap')}</label>
                 <input style={inputS} placeholder={L('e.g. Sarah Wijaya', 'cth. Sarah Wijaya')} value={name} onChange={e => setName(e.target.value)} />
@@ -557,7 +620,7 @@ const PortalAuth = ({ lang, onNav }) => {
               : mode === 'login' ? L('Sign in', 'Masuk')
               : mode === 'forgot' ? L('Send reset link', 'Kirim tautan reset')
               : mode === 'reset' ? L('Save new password & sign in', 'Simpan kata sandi & masuk')
-              : role === 'owner' ? L('Create account & open dashboard', 'Buat akun & buka dasbor') : L('Create account', 'Buat akun')} <PIcon name="arrowR" size={16} />
+              : role === 'owner' ? L('Create account & open dashboard', 'Buat akun & buka dasbor') : role === 'agent' ? L('Register as agent', 'Daftar sebagai agen') : L('Create account', 'Buat akun')} <PIcon name="arrowR" size={16} />
           </button>
           )}
 

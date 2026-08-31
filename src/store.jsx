@@ -175,6 +175,20 @@ export function StoreProvider({ children }) {
       dispatch({ type: 'LOGOUT' });
     },
 
+    /** Perbarui objek user di state (mis. setelah ubah profil). */
+    setUser(user) {
+      if (user) dispatch({ type: 'LOGIN', user });
+    },
+
+    /** Ambil ulang /me dari server dan segarkan state user. */
+    async refreshUser() {
+      try {
+        const { user } = await authApi.me();
+        dispatch({ type: 'LOGIN', user });
+        return user;
+      } catch { return null; }
+    },
+
     async fetchListings(filters = {}, page = 1, perPage = 9) {
       dispatch({ type: 'LISTINGS_LOADING' });
       try {

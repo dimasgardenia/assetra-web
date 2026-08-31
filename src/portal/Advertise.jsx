@@ -2,11 +2,46 @@
 import React from 'react';
 import { useT } from '../i18n';
 import { PIcon, fmtRp, PortalNav, PortalFooter } from './shared';
+import { api } from '../api/client';
+import { useUser } from '../store';
+import { useIsMobile } from '../lib/useIsMobile';
+import AppDialog from './AppDialog';
 
 const PortalAdvertise = ({ lang, onLang, onNav }) => {
   const { t } = useT();
   const id = lang === 'id';
+  const isMobile = useIsMobile();
   const [view, setView] = React.useState('tiers');
+  const user = useUser();
+  const isVerified = !!user && !!user.emailVerified;
+  const needsVerify = !!user && !user.emailVerified;
+  const [dialog, setDialog] = React.useState(null);
+  /* Nomor sales diambil dari server (endpoint wajib login+verifikasi) — tidak di-hardcode. */
+  const [contactPhone, setContactPhone] = React.useState(null);
+  React.useEffect(() => {
+    if (!isVerified) { setContactPhone(null); return; }
+    let alive = true;
+    api.get('/api/contact').then(r => { if (alive && r.data?.whatsapp) setContactPhone(r.data.whatsapp); }).catch(() => {});
+    return () => { alive = false; };
+  }, [isVerified]);
+  const openWA = (text) => {
+    if (!isVerified) {
+      if (needsVerify) setDialog({ icon: 'lock', title: id ? 'Verifikasi email dulu' : 'Verify your email', message: id ? 'Cek kotak masuk Anda dan verifikasi email untuk menghubungi tim sales.' : 'Check your inbox and verify your email to contact the sales team.' });
+      else setDialog({ icon: 'lock', title: id ? 'Perlu masuk dulu' : 'Sign in required', message: id ? 'Masuk atau daftar dulu untuk menghubungi tim sales Assetra.' : 'Sign in or register first to contact the Assetra sales team.', primary: id ? 'Masuk / Daftar' : 'Sign in / Register', onPrimary: () => onNav && onNav('signin') });
+      return;
+    }
+    if (!contactPhone) {
+      setDialog({ icon: 'chat', title: id ? 'Sebentar ya' : 'One moment', message: id ? 'Sedang memuat nomor kontak — coba lagi sebentar.' : 'Loading the contact number — please try again shortly.' });
+      return;
+    }
+    window.open(`https://wa.me/${contactPhone}?text=${encodeURIComponent(text)}`, '_blank', 'noopener');
+  };
+  const pickTier = (tr) => {
+    const priceLabel = tr.price == null ? (id ? 'Kustom' : 'Custom') : tr.price === 0 ? 'Gratis' : `${fmtRp(tr.price)}${tr.unit}`;
+    openWA(id
+      ? `Halo Assetra, saya tertarik dengan paket keanggotaan "${tr.name}" (${priceLabel}). Mohon info cara berlangganan.`
+      : `Hi Assetra, I'm interested in the "${tr.name}" membership plan (${priceLabel}). Please share how to subscribe.`);
+  };
 
   const tiers = [
     { id: 'starter', name: t('p.adv.starter'), price: 0, unit: '', features: id ? ['5 listing aktif', 'Statistik dasar', 'Profil agen'] : ['5 active listings', 'Basic stats', 'Agent profile'], cta: t('p.adv.choose') },
@@ -44,7 +79,7 @@ const PortalAdvertise = ({ lang, onLang, onNav }) => {
 
       {view === 'tiers' && (
         <div className="pwrap" style={{ padding: '24px 32px 56px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, 1fr)', gap: 16 }}>
             {tiers.map(tr => (
               <div key={tr.id} style={{ background: '#fff', border: tr.popular ? '2px solid var(--teal)' : '1px solid var(--line)', borderRadius: 14, padding: 24, position: 'relative', display: 'flex', flexDirection: 'column' }}>
                 {tr.popular && <div style={{ position: 'absolute', top: -11, left: 24, background: 'var(--brand-gradient)', color: '#fff', fontFamily: 'var(--mono)', fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase', padding: '4px 10px', borderRadius: 100, fontWeight: 600 }}>{t('p.adv.popular')}</div>}
@@ -60,13 +95,13 @@ const PortalAdvertise = ({ lang, onLang, onNav }) => {
                     </div>
                   ))}
                 </div>
-                <button className={`p-btn ${tr.popular ? 'p-btn-cyan' : 'p-btn-ghost'}`} style={{ width: '100%' }}>{tr.cta}</button>
+                <button className={`p-btn ${tr.popular ? 'p-btn-cyan' : 'p-btn-ghost'}`} style={{ width: '100%' }} onClick={() => pickTier(tr)}>{tr.cta}</button>
               </div>
             ))}
           </div>
 
           {/* display ad + featured explainer */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 24 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16, marginTop: 24 }}>
             {[
               { ic: 'megaphone', t: t('p.adv.display'), d: id ? 'Banner di homepage, hasil pencarian, dan halaman detail. Penargetan per lokasi & kategori, harga per impresi (CPM).' : 'Banners on home, search, and detail pages. Targeted by location & category, priced per impression (CPM).' },
               { ic: 'star', t: t('p.adv.featured'), d: id ? 'Listing Anda tampil di atas hasil pencarian dengan label Sponsored — hingga 7x lebih banyak dilihat.' : 'Your listing appears atop search results with a Sponsored badge — up to 7× more views.' },
@@ -86,7 +121,7 @@ const PortalAdvertise = ({ lang, onLang, onNav }) => {
       {view === 'dash' && (
         <div className="pwrap" style={{ padding: '24px 32px 56px' }}>
           {/* KPIs */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 14, marginBottom: 24 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(5, 1fr)', gap: 14, marginBottom: 24 }}>
             {[
               [t('p.adv.impressions'), '1,24 jt', '▲ 18%'], [t('p.adv.clicks'), '38,400', '▲ 12%'], [t('p.adv.ctr'), '3.1%', '▲ 0.4pp'], [t('p.adv.leads'), '892', '▲ 22%'], [t('p.adv.spend'), 'Rp 42 jt', ''],
             ].map((k, i) => (
@@ -100,7 +135,7 @@ const PortalAdvertise = ({ lang, onLang, onNav }) => {
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
             <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 500, fontSize: 24, margin: 0 }}>{t('p.adv.campaigns')}</h2>
-            <button className="p-btn p-btn-cyan"><PIcon name="plus" size={15} /> {t('p.adv.newCampaign')}</button>
+            <button className="p-btn p-btn-cyan" onClick={() => openWA(id ? 'Halo Assetra, saya ingin membuat kampanye iklan baru. Mohon dibantu.' : 'Hi Assetra, I would like to set up a new ad campaign. Please assist.')}><PIcon name="plus" size={15} /> {t('p.adv.newCampaign')}</button>
           </div>
 
           <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 12, overflow: 'hidden' }}>
@@ -141,6 +176,7 @@ const PortalAdvertise = ({ lang, onLang, onNav }) => {
       )}
 
       <PortalFooter />
+      <AppDialog dialog={dialog} onClose={() => setDialog(null)} lang={lang} />
     </div>
   );
 };
