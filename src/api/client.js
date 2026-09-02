@@ -2,7 +2,9 @@
    normalizes errors, and resolves relative file paths (/files/photos/...)
    to absolute URLs against the API origin. */
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3001';
+// Empty = same origin (Vite dev/preview proxies /api and /files to the backend).
+// Set VITE_API_BASE when the frontend is hosted separately from the API.
+const API_BASE = import.meta.env.VITE_API_BASE ?? '';
 const TOKEN_KEY = 'assetra:token';
 
 export function getToken() {
