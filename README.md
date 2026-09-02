@@ -30,3 +30,13 @@ Vite akan mencetak alamat `Network: http://192.168.x.x:5173/`.
 Akun demo: `admin@assetra.co.id` / `admin123` dan `bidder@assetra.co.id` / `bidder123`.
 
 Jika backend berjalan di host/port lain, set `API_PROXY_TARGET=http://host:port` sebelum `npm run dev`.
+
+## Testing dari HP saja (tanpa laptop)
+
+**GitHub Codespaces** — server berjalan di cloud GitHub, gratis 60 jam/bulan untuk akun personal.
+1. Di Chrome HP buka `https://github.com/dimasgardenia/assetra-web`, pilih branch yang ingin diuji.
+2. Tombol **Code → Codespaces → Create codespace on <branch>** (atau buka `https://github.com/codespaces/new?repo=dimasgardenia/assetra-web&ref=<branch>`).
+3. Tunggu ±2 menit. `.devcontainer/` otomatis meng-clone `assetra-api`, install, seed, dan menjalankan API + Vite.
+4. Buka tab **Ports** → baris **Assetra Web (5173)** → ikon globe. Itu URL aplikasinya di HP Anda.
+
+Detail ada di `.devcontainer/README.md`. Alternatif dengan URL publik permanen: lihat `render.yaml` di repo `assetra-api`.

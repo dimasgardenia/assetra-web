@@ -20,6 +20,10 @@ export default defineConfig({
     port: 5173,
     strictPort: false,
     proxy,
+    // Cloud dev hosts (GitHub Codespaces) reach Vite through a public hostname.
+    allowedHosts: ['.app.github.dev', '.github.dev'],
+    // Behind Codespaces' HTTPS port forwarding, HMR must connect on 443.
+    hmr: process.env.CODESPACES ? { clientPort: 443 } : undefined,
   },
   preview: {
     host: true,

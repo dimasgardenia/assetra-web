@@ -1,0 +1,17 @@
+{
+  "name": "Assetra (web + api)",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:22",
+  "hostRequirements": { "cpus": 2 },
+  "postCreateCommand": "bash .devcontainer/setup.sh",
+  "postStartCommand": "bash .devcontainer/start.sh",
+  "forwardPorts": [5173],
+  "portsAttributes": {
+    "5173": { "label": "Assetra Web", "onAutoForward": "notify" },
+    "3001": { "label": "Assetra API", "onAutoForward": "silent" }
+  },
+  "customizations": {
+    "codespaces": {
+      "openFiles": [".devcontainer/README.md"]
+    }
+  }
+}
