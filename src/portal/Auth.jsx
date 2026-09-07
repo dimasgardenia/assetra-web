@@ -222,10 +222,18 @@ const PortalAuth = ({ lang, onNav }) => {
           } catch (ex) { /* diamkan; akun tetap dibuat */ }
         }
         if (r?.pendingVerification) {
-          /* Gerbang verifikasi: tampilkan halaman "Cek email Anda". */
+          /* Gerbang verifikasi: tampilkan halaman "Cek email Anda". Pesan harus
+             jujur: hanya bilang "terkirim" bila server memang mengirim email. */
           setDemoVerifyToken(r.demo?.verifyToken || '');
           setMode('pending');
-          setInfo(L('Verification email sent — click the button inside to activate your account.', 'Email verifikasi terkirim — klik tombol di dalamnya untuk mengaktifkan akun.'));
+          if (r.demo) {
+            setInfo(L('Demo mode: this server has no email provider configured (RESEND_API_KEY), so no email was sent. Tap "Verify now (demo mode)" below to activate your account.',
+                      'Mode demo: server ini belum punya penyedia email (RESEND_API_KEY), jadi email tidak dikirim. Tekan "Verifikasi sekarang (mode demo)" di bawah untuk mengaktifkan akun.'));
+          } else if (r.emailSent === false) {
+            setError(r.sendError || L('Account created, but the verification email failed to send — try "Resend".', 'Akun dibuat, tetapi email verifikasi gagal dikirim — coba "Kirim ulang".'));
+          } else {
+            setInfo(L('Verification email sent — click the button inside to activate your account.', 'Email verifikasi terkirim — klik tombol di dalamnya untuk mengaktifkan akun.'));
+          }
           return;
         }
         user = r;
@@ -233,6 +241,18 @@ const PortalAuth = ({ lang, onNav }) => {
       if (user.role === 'admin') onNav && onNav('admin');
       else onNav && onNav('home');
     } catch (e) {
+      /* Email sudah dipakai: tampilkan pesan server. Bila akun lama belum
+         diverifikasi, langsung ke halaman pending agar bisa kirim ulang tautan. */
+      if (e.status === 409 && e.body?.code === 'EMAIL_TAKEN') {
+        if (e.body.emailVerified === false) {
+          setMode('pending');
+          setError('');
+          setInfo(e.message);
+          return;
+        }
+        setError(e.message);
+        return;
+      }
       /* Akun belum verifikasi mencoba login → arahkan ke halaman pending. */
       if (e.status === 403 && e.body?.code === 'EMAIL_UNVERIFIED') {
         setMode('pending');
@@ -455,7 +475,9 @@ const PortalAuth = ({ lang, onNav }) => {
                 <>
                   <div style={{ width: 74, height: 74, borderRadius: '50%', margin: '0 auto 14px', background: 'rgba(59,196,217,0.12)', border: '1px solid rgba(59,196,217,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32 }}>✉️</div>
                   <div style={{ fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.6 }}>
-                    {L('Didn\'t get it? Check your spam folder, or resend below.', 'Belum menerima? Cek folder spam, atau kirim ulang di bawah.')}
+                    {demoVerifyToken
+                      ? L('No email is sent in demo mode — use the "Verify now" button below.', 'Di mode demo tidak ada email yang dikirim — gunakan tombol "Verifikasi sekarang" di bawah.')
+                      : L('Didn\'t get it? Check your spam folder, or resend below.', 'Belum menerima? Cek folder spam, atau kirim ulang di bawah.')}
                   </div>
                 </>
               )}

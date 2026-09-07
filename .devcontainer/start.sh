@@ -5,6 +5,15 @@ set -euo pipefail
 WEB_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 API_DIR="${WEB_DIR}/../assetra-api"
 
+# Di Codespaces, tautan verifikasi/reset di email harus menunjuk ke URL publik
+# Codespace, bukan localhost. Email hanya benar-benar terkirim bila secret
+# RESEND_API_KEY ada (github.com/settings/codespaces → New secret).
+if [ -n "${CODESPACE_NAME:-}" ]; then
+  export APP_URL="https://${CODESPACE_NAME}-5173.${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:-app.github.dev}"
+  echo "[start] APP_URL=$APP_URL"
+  [ -n "${RESEND_API_KEY:-}" ] && echo "[start] RESEND_API_KEY set — verification emails will be sent" || echo "[start] RESEND_API_KEY not set — demo mode, no emails are sent"
+fi
+
 pkill -f "src/server.js" 2>/dev/null || true
 pkill -f "vite" 2>/dev/null || true
 
