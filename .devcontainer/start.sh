@@ -11,7 +11,7 @@ API_DIR="${WEB_DIR}/../assetra-api"
 if [ -n "${CODESPACE_NAME:-}" ]; then
   export APP_URL="https://${CODESPACE_NAME}-5173.${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:-app.github.dev}"
   echo "[start] APP_URL=$APP_URL"
-  [ -n "${RESEND_API_KEY:-}" ] && echo "[start] RESEND_API_KEY set — verification emails will be sent" || echo "[start] RESEND_API_KEY not set — demo mode, no emails are sent"
+  [ -n "${RESEND_API_KEY:-}" ] && echo "[start] RESEND_API_KEY set — verification emails will be sent" || echo "[start] RESEND_API_KEY not set — verification and reset emails cannot be sent"
 fi
 
 pkill -f "src/server.js" 2>/dev/null || true

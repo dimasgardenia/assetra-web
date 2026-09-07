@@ -74,7 +74,6 @@ const PortalAuth = ({ lang, onNav }) => {
 
   /* Verifikasi email: tautan /auth?verify=<token> diklik dari kotak masuk.
      Sukses → simpan sesi lalu masuk ke situs (reload agar store terhidrasi). */
-  const [demoVerifyToken, setDemoVerifyToken] = React.useState('');
   /* Guard useRef: StrictMode (dev) menjalankan efek dua kali — tanpa guard,
      panggilan kedua memakai token yang sudah hangus dan menimpa hasil sukses. */
   const verifyFired = React.useRef(false);
@@ -102,7 +101,6 @@ const PortalAuth = ({ lang, onNav }) => {
   const isValidIndoPhone = (p) => /^(\+62|62|08)[\d\s\-().]{7,15}$/.test(String(p).trim());
   const [otpCode, setOtpCode] = React.useState('');
   const [otpPhone, setOtpPhone] = React.useState('');   // nomor tujuan (tampilan)
-  const [otpDemo, setOtpDemo] = React.useState('');     // kode demo bila penyedia WA belum ada
   const [otpNewPhone, setOtpNewPhone] = React.useState(''); // input nomor utk akun tanpa nomor (SSO)
   const sendOtp = async (customPhone) => {
     if (busy) return;
@@ -111,10 +109,7 @@ const PortalAuth = ({ lang, onNav }) => {
       const r = await api.post('/api/auth/phone/send-otp', customPhone ? { phone: customPhone } : {});
       if (r?.alreadyVerified) { window.location.replace('/'); return; }
       setOtpPhone(r.phone || '');
-      setOtpDemo(r.demo?.otp || '');
-      setInfo(r.demo
-        ? L('Demo mode: WhatsApp provider not connected yet — your code is shown below.', 'Mode demo: penyedia WhatsApp belum terhubung — kode Anda tampil di bawah.')
-        : L(`Code sent via WhatsApp to ${r.phone}.`, `Kode terkirim via WhatsApp ke ${r.phone}.`));
+      setInfo(L(`Code sent via WhatsApp to ${r.phone}.`, `Kode terkirim via WhatsApp ke ${r.phone}.`));
     } catch (e) {
       setError(e.message || L('Failed to send code', 'Gagal mengirim kode'));
     } finally { setBusy(false); }
@@ -139,7 +134,6 @@ const PortalAuth = ({ lang, onNav }) => {
         setAlreadyVerified(true);
         return;
       }
-      if (r?.demo?.verifyToken) setDemoVerifyToken(r.demo.verifyToken);
       setInfo(L('Verification email re-sent — check your inbox (and spam folder).', 'Email verifikasi dikirim ulang — cek kotak masuk (dan folder spam).'));
     } catch (e) {
       setError(e.message || L('Something went wrong', 'Terjadi kesalahan'));
@@ -158,17 +152,8 @@ const PortalAuth = ({ lang, onNav }) => {
       if (!email) { setError(L('Enter your account email first', 'Isi email akun Anda dulu')); return; }
       setBusy(true); setError(''); setInfo('');
       try {
-        const r = await api.post('/api/auth/forgot', { email });
-        if (r?.demo?.resetToken) {
-          setResetToken(r.demo.resetToken);
-          setNewPw(''); setNewPw2('');
-          setMode('reset');
-          setInfo(L(
-            'Demo mode: normally this link arrives by email. Set your new password below (token valid 15 minutes).',
-            'Mode demo: biasanya tautan ini dikirim via email. Silakan buat kata sandi baru di bawah (token berlaku 15 menit).'));
-        } else {
-          setInfo(L('If the email is registered, a reset link has been sent.', 'Jika email terdaftar, tautan reset telah dikirim.'));
-        }
+        await api.post('/api/auth/forgot', { email });
+        setInfo(L('If the email is registered, a reset link has been sent.', 'Jika email terdaftar, tautan reset telah dikirim.'));
       } catch (e) {
         setError(e.message || L('Something went wrong', 'Terjadi kesalahan'));
       } finally { setBusy(false); }
@@ -224,12 +209,8 @@ const PortalAuth = ({ lang, onNav }) => {
         if (r?.pendingVerification) {
           /* Gerbang verifikasi: tampilkan halaman "Cek email Anda". Pesan harus
              jujur: hanya bilang "terkirim" bila server memang mengirim email. */
-          setDemoVerifyToken(r.demo?.verifyToken || '');
           setMode('pending');
-          if (r.demo) {
-            setInfo(L('Demo mode: this server has no email provider configured (RESEND_API_KEY), so no email was sent. Tap "Verify now (demo mode)" below to activate your account.',
-                      'Mode demo: server ini belum punya penyedia email (RESEND_API_KEY), jadi email tidak dikirim. Tekan "Verifikasi sekarang (mode demo)" di bawah untuk mengaktifkan akun.'));
-          } else if (r.emailSent === false) {
+          if (r.emailSent === false) {
             setError(r.sendError || L('Account created, but the verification email failed to send — try "Resend".', 'Akun dibuat, tetapi email verifikasi gagal dikirim — coba "Kirim ulang".'));
           } else {
             setInfo(L('Verification email sent — click the button inside to activate your account.', 'Email verifikasi terkirim — klik tombol di dalamnya untuk mengaktifkan akun.'));
@@ -475,9 +456,7 @@ const PortalAuth = ({ lang, onNav }) => {
                 <>
                   <div style={{ width: 74, height: 74, borderRadius: '50%', margin: '0 auto 14px', background: 'rgba(59,196,217,0.12)', border: '1px solid rgba(59,196,217,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32 }}>✉️</div>
                   <div style={{ fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.6 }}>
-                    {demoVerifyToken
-                      ? L('No email is sent in demo mode — use the "Verify now" button below.', 'Di mode demo tidak ada email yang dikirim — gunakan tombol "Verifikasi sekarang" di bawah.')
-                      : L('Didn\'t get it? Check your spam folder, or resend below.', 'Belum menerima? Cek folder spam, atau kirim ulang di bawah.')}
+                    {L('Didn\'t get it? Check your spam folder, or resend below.', 'Belum menerima? Cek folder spam, atau kirim ulang di bawah.')}
                   </div>
                 </>
               )}
@@ -508,12 +487,6 @@ const PortalAuth = ({ lang, onNav }) => {
                 </>
               ) : (
                 <>
-                  {otpDemo && (
-                    <div style={{ textAlign: 'center', marginBottom: 16, padding: '14px 16px', borderRadius: 10, background: 'rgba(176,136,56,0.08)', border: '1px dashed rgba(176,136,56,0.45)' }}>
-                      <div style={{ fontFamily: 'var(--mono)', fontSize: 10, letterSpacing: '0.1em', color: 'var(--gold-2, #B08838)', textTransform: 'uppercase', marginBottom: 6 }}>{L('Demo mode — code shown here', 'Mode demo — kode tampil di sini')}</div>
-                      <div style={{ fontFamily: 'var(--mono)', fontSize: 28, fontWeight: 700, letterSpacing: 8, color: 'var(--ink)' }}>{otpDemo}</div>
-                    </div>
-                  )}
                   <div style={field}>
                     <label style={labelS}>{L('6-digit code', 'Kode 6 digit')}</label>
                     <input
@@ -620,19 +593,6 @@ const PortalAuth = ({ lang, onNav }) => {
               <button className="p-btn p-btn-cyan" disabled={busy} style={{ width: '100%', height: 50, fontSize: 15, borderRadius: 10, justifyContent: 'center', opacity: busy ? 0.6 : 1 }} onClick={resendVerification}>
                 {busy ? L('Sending…', 'Mengirim…') : L('Resend verification email', 'Kirim ulang email verifikasi')} <PIcon name="arrowR" size={16} />
               </button>
-              {demoVerifyToken && (
-                <button className="p-btn p-btn-ghost" style={{ width: '100%', height: 46, marginTop: 10, borderRadius: 10, justifyContent: 'center' }}
-                  onClick={async () => {
-                    try {
-                      const r = await api.post('/api/auth/verify-email', { token: demoVerifyToken });
-                      setToken(r.token);
-                      const needsPhone = r.user?.phone && !r.user?.phoneVerified;
-                      window.location.replace(needsPhone ? '/auth' : (r.user?.role === 'admin' ? '/admin' : '/'));
-                    } catch (e) { setError(e.message); }
-                  }}>
-                  {L('Verify now (demo mode)', 'Verifikasi sekarang (mode demo)')}
-                </button>
-              )}
             </>
             )
           ) : mode !== 'verifying' && mode !== 'phone' && (
