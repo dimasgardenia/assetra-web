@@ -458,6 +458,7 @@ const mapApiListing = (r) => ({
   id: r.id,
   title: r.title,
   addr: r.address || r.region || '—',
+  lat: r.lat ?? null, lng: r.lng ?? null,
   kind: r.type || 'property',
   mode: r.mode || 'sale',
   price: r.price ?? r.currentBid ?? 0,

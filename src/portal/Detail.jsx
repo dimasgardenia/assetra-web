@@ -8,6 +8,7 @@ import { useUser } from '../store';
 import { useIsMobile } from '../lib/useIsMobile';
 import { Spinner } from './Loading';
 import AIChatBox from './AIChatBox';
+import { ListingMap } from './MapWidgets';
 
 /* Gerbang login: kartu terkunci untuk konten yang butuh masuk dulu
    (lokasi peta & nomor kontak agen). */
@@ -260,28 +261,16 @@ const PortalDetail = ({ lang, onLang, onNav, listing }) => {
             })()}
             {tab === 'location' && (
               isVerified ? (
-                /* Hanya RADIUS perkiraan area — bukan titik persis. Lokasi tepat
-                   diberikan oleh agen Assetra / agen terverifikasi saat kontak. */
+                /* Peta Google Maps dengan pin lokasi listing (hanya untuk pengguna terverifikasi). */
                 <div>
-                  <div style={{ height: 320, borderRadius: 10, position: 'relative', overflow: 'hidden', border: '1px solid var(--line)', background: 'linear-gradient(135deg, #e8edf5, #dce6f0)' }}>
-                    <div style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(rgba(26,111,168,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(26,111,168,0.08) 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
-                    {/* Lingkaran radius (area perkiraan), tanpa penanda titik tepat */}
-                    <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 200, height: 200, borderRadius: '50%', background: 'radial-gradient(circle, rgba(26,111,168,0.22) 0%, rgba(26,111,168,0.12) 55%, rgba(26,111,168,0.04) 100%)', border: '2px dashed rgba(26,111,168,0.55)' }} />
-                    <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, color: 'var(--ink)', textAlign: 'center' }}>
-                      <PIcon name="pin" size={18} />
-                      <span style={{ fontFamily: 'var(--mono)', fontSize: 10, letterSpacing: '0.06em', color: 'var(--ink-2)' }}>± 1 km</span>
-                    </div>
-                    {/* Badge sudut: perkiraan area */}
-                    <div style={{ position: 'absolute', top: 12, left: 12, background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(4px)', borderRadius: 8, padding: '6px 10px', fontFamily: 'var(--mono)', fontSize: 10, letterSpacing: '0.05em', color: 'var(--ink-2)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <PIcon name="lock" size={12} /> {lang === 'id' ? 'PERKIRAAN AREA' : 'APPROX. AREA'}
-                    </div>
-                  </div>
+                  <ListingMap lang={lang} lat={l.lat} lng={l.lng} title={l.title} height={320} />
                   <div style={{ marginTop: 12, background: 'rgba(26,111,168,0.06)', border: '1px solid rgba(26,111,168,0.2)', borderRadius: 10, padding: '12px 14px', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
                     <span style={{ color: 'var(--teal)', flexShrink: 0, marginTop: 1 }}><PIcon name="shield" size={16} /></span>
                     <div style={{ fontSize: 12.5, color: 'var(--ink-2)', lineHeight: 1.55 }}>
+                      {l.addr && l.addr !== '—' && <div style={{ fontWeight: 600, color: 'var(--ink)', marginBottom: 2 }}>{l.addr}</div>}
                       {lang === 'id'
-                        ? 'Peta menampilkan perkiraan area (radius), bukan titik persis. Untuk alamat & lokasi tepat, hubungi agen Assetra atau agen terverifikasi lewat tombol kontak.'
-                        : 'The map shows an approximate area (radius), not the exact point. For the precise address & location, contact an Assetra or verified agent via the contact buttons.'}
+                        ? 'Titik lokasi ditandai oleh pemilik/agen. Untuk jadwal kunjungan dan detail akses, hubungi agen lewat tombol kontak.'
+                        : 'The pin is placed by the owner/agent. For viewing schedules and access details, contact the agent via the contact buttons.'}
                     </div>
                   </div>
                 </div>

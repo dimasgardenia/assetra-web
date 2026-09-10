@@ -4,6 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useT } from '../i18n';
 import { PIcon, fmtRp, PortalNav, PortalFooter, PCard, AdSlot, PLISTINGS, usePortalListings } from './shared';
 import LocationInput from './LocationInput';
+import { ListingsMap } from './MapWidgets';
 import { useIsMobile } from '../lib/useIsMobile';
 
 const PER_PAGE = 9;
@@ -200,7 +201,16 @@ const PortalSearch = ({ lang, onLang, onNav, listings }) => {
         <main style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
             <div><span style={{ fontFamily: 'var(--serif)', fontSize: 22 }}>{sorted.length.toLocaleString('id-ID')}</span> <span style={{ color: 'var(--muted)', fontSize: 14 }}>{t('p.search.results')}</span></div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, flexWrap: 'wrap' }}>
+              <div style={{ display: 'inline-flex', border: '1px solid var(--line)', borderRadius: 8, overflow: 'hidden' }}>
+                {[['list', L('List', 'Daftar'), 'dash'], ['map', L('Map', 'Peta'), 'pin']].map(([v, label, ic]) => (
+                  <button key={v} type="button" onClick={() => setView(v)}
+                    style={{ border: 'none', cursor: 'pointer', padding: '7px 11px', display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12.5, fontFamily: 'inherit',
+                      background: view === v ? 'var(--ink)' : '#fff', color: view === v ? '#fff' : 'var(--ink-2)' }}>
+                    <PIcon name={ic} size={13} /> {label}
+                  </button>
+                ))}
+              </div>
               <span style={{ color: 'var(--muted)' }}>{t('p.search.sort')}:</span>
               <select className="p-input" style={{ width: 'auto', padding: '7px 10px' }} value={sort} onChange={e => setSort(e.target.value)}>
                 <option value="relevance">{t('p.search.sortRelevance')}</option>
@@ -211,8 +221,15 @@ const PortalSearch = ({ lang, onLang, onNav, listings }) => {
             </div>
           </div>
 
+          {/* map view — every matching listing that has coordinates */}
+          {view === 'map' && (
+            <div style={{ marginBottom: 22 }}>
+              <ListingsMap lang={lang} listings={sorted} onSelect={l => onNav('detail', l)} height={isMobile ? 380 : 520} />
+            </div>
+          )}
+
           {/* sponsored block — page 1 only */}
-          {sponsored.length > 0 && (
+          {view === 'list' && sponsored.length > 0 && (
             <>
               <div style={{ marginBottom: 20 }}>
                 <div style={{ fontFamily: 'var(--mono)', fontSize: 10, letterSpacing: '0.1em', color: 'var(--gold-2)', textTransform: 'uppercase', marginBottom: 10 }}>★ Sponsored results</div>
@@ -224,7 +241,7 @@ const PortalSearch = ({ lang, onLang, onNav, listings }) => {
             </>
           )}
 
-          {pageRows.length > 0 ? (
+          {view === 'map' ? null : pageRows.length > 0 ? (
             <div className="p-grid">
               {pageRows.map(l => <PCard key={l.id} l={l} onNav={onNav} />)}
             </div>
@@ -240,7 +257,7 @@ const PortalSearch = ({ lang, onLang, onNav, listings }) => {
           <div style={{ margin: '22px 0' }}><AdSlot variant="leaderboard" bank="bri" placement="search-leaderboard" /></div>
 
           {/* pagination — 9 per page */}
-          {totalPages > 1 && (
+          {view === 'list' && totalPages > 1 && (
             <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginTop: 8 }}>
               <span className="p-chip" onClick={() => setPageSafe(curPage - 1)} style={{ minWidth: 38, justifyContent: 'center', padding: '8px 0', cursor: 'pointer', opacity: curPage === 1 ? 0.4 : 1 }}>‹</span>
               {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (

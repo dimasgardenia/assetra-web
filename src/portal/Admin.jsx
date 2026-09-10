@@ -11,6 +11,8 @@ import { api, resolveFileUrl } from '../api/client';
 import { resizeToAvatarDataUrl } from '../lib/image';
 import AppDialog from './AppDialog';
 import { useUser } from '../store';
+import { MapPicker } from './MapWidgets';
+import { geocodeAddress, HAS_MAPS_KEY } from '../lib/googleMaps';
 
 /* Admin form type → backend {type, mode} */
 const TY_MAP = {
@@ -149,8 +151,8 @@ const PortalAdmin = ({ lang, onLang, onNav }) => {
 
         <div style={{ padding: 28, overflowY: 'auto' }}>
           {nav === 'dashboard' && <AdmDash L={L} />}
-          {nav === 'listings' && <AdmListings L={L} scope="all" persona={persona} onGoBulk={() => setNav('bulk')} />}
-          {nav === 'mylistings' && <AdmListings L={L} scope="mine" persona={persona} me={user} onGoBulk={() => setNav('bulk')} />}
+          {nav === 'listings' && <AdmListings L={L} lang={lang} scope="all" persona={persona} onGoBulk={() => setNav('bulk')} />}
+          {nav === 'mylistings' && <AdmListings L={L} lang={lang} scope="mine" persona={persona} me={user} onGoBulk={() => setNav('bulk')} />}
           {nav === 'bulk' && <AdmBulk L={L} />}
           {nav === 'ads' && <AdmAds L={L} />}
           {nav === 'leads' && <AdmLeads L={L} persona={persona} />}
@@ -278,7 +280,7 @@ const Modal = ({ title, onClose, children, width = 460 }) => (
   </div>
 );
 
-const ListingModal = ({ L, mode, initial, lockOwner, onClose, onSave }) => {
+const ListingModal = ({ L, lang, mode, initial, lockOwner, onClose, onSave }) => {
   const [f, setF] = React.useState(initial);
   const ro = mode === 'view';
   const set = (k) => (e) => setF(prev => ({ ...prev, [k]: e.target.value }));
@@ -336,6 +338,10 @@ const ListingModal = ({ L, mode, initial, lockOwner, onClose, onSave }) => {
         {Number(f.price) > 0 && <div style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--teal)', margin: '-6px 0 12px' }}>= {fmtRp(Number(f.price))}</div>}
         <FieldRow label={L('Address', 'Alamat')}>
           <input style={inputStyle} value={f.addr || ''} onChange={set('addr')} disabled={ro} placeholder={L('e.g. Jl. Kemang Raya No. 8, Jakarta Selatan', 'cth. Jl. Kemang Raya No. 8, Jakarta Selatan')} />
+        </FieldRow>
+        <FieldRow label={L('Location on map', 'Lokasi di peta')}>
+          <MapPicker lang={lang} address={f.addr} lat={f.lat ?? null} lng={f.lng ?? null} disabled={ro}
+            onChange={({ lat, lng, address }) => setF(prev => ({ ...prev, lat, lng, ...(address ? { addr: address } : {}) }))} />
         </FieldRow>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
           <FieldRow label={L('Bedrooms', 'Kamar tidur')}>
@@ -450,7 +456,7 @@ const ListingModal = ({ L, mode, initial, lockOwner, onClose, onSave }) => {
   );
 };
 
-const AdmListings = ({ L, scope, persona, me, onGoBulk }) => {
+const AdmListings = ({ L, lang, scope, persona, me, onGoBulk }) => {
   /* scope: 'all' (admin) | 'owner' (persona demo) | 'mine' (agen: hanya listing
      yang ia buat, dari database — tanpa baris contoh). */
   const mine = scope === 'mine';
@@ -488,7 +494,7 @@ const AdmListings = ({ L, scope, persona, me, onGoBulk }) => {
   const openRow = (mode, id) => setModal({ mode, id });
   const current = modal?.id != null ? items.find(l => l.id === modal.id) : null;
   const initialForm = modal?.mode === 'new'
-    ? { t: '', ty: LISTING_TYPES[0], price: '', addr: '', beds: '', baths: '', area: '', bldArea: '', floors: '', year: '', cert: '', desc: '', fac: '', owner: mine ? myName : '', promo: '—', st: 'live' }
+    ? { t: '', ty: LISTING_TYPES[0], price: '', addr: '', beds: '', baths: '', area: '', bldArea: '', floors: '', year: '', cert: '', desc: '', fac: '', lat: null, lng: null, owner: mine ? myName : '', promo: '—', st: 'live' }
     : current ? { ...current, price: String(current.price) } : null;
 
   /* Load marketplace listings from the database so they survive refresh. */
@@ -502,6 +508,7 @@ const AdmListings = ({ L, scope, persona, me, onGoBulk }) => {
         bldArea: x.buildingArea, floors: x.floors, year: x.yearBuilt,
         cert: x.certificate || '', desc: x.description || '',
         fac: (x.facilities || []).join(', '),
+        lat: x.lat ?? null, lng: x.lng ?? null,
         owner: x.agentName || '—', leads: 0,
         promo: x.promo || '—', st: x.status,
         photos: (x.uploadedPhotos || []).map(u => ({ url: resolveFileUrl(u) })),
@@ -521,6 +528,7 @@ const AdmListings = ({ L, scope, persona, me, onGoBulk }) => {
         const created = await apiAdmin(() => adminApi.post('/api/listings', {
           title: f.t, type, typeLabel: f.ty, mode,
           price: Number(f.price), address: f.addr || null,
+          lat: f.lat ?? null, lng: f.lng ?? null,
           beds: f.beds ? Number(f.beds) : null,
           baths: f.baths ? Number(f.baths) : null,
           area: f.area ? Number(f.area) : null,
@@ -556,6 +564,7 @@ const AdmListings = ({ L, scope, persona, me, onGoBulk }) => {
         try {
           await apiAdmin(() => adminApi.put(`/api/listings/${encodeURIComponent(modal.id)}`, {
             title: f.t, price: Number(f.price), address: f.addr || null, status: f.st,
+            lat: f.lat ?? null, lng: f.lng ?? null,
             beds: f.beds ? Number(f.beds) : null, baths: f.baths ? Number(f.baths) : null,
             area: f.area ? Number(f.area) : null,
             buildingArea: f.bldArea ? Number(f.bldArea) : null,
@@ -633,7 +642,7 @@ const AdmListings = ({ L, scope, persona, me, onGoBulk }) => {
         </table>
       </Card>
       {modal && initialForm && (
-        <ListingModal L={L} mode={modal.mode} initial={initialForm} lockOwner={mine} onClose={() => setModal(null)} onSave={saveModal} />
+        <ListingModal L={L} lang={lang} mode={modal.mode} initial={initialForm} lockOwner={mine} onClose={() => setModal(null)} onSave={saveModal} />
       )}
     </>
   );
@@ -805,7 +814,14 @@ const AdmBulk = ({ L }) => {
     for (const f of ready) {
       failed[f.n] = [];
       for (let i = 0; i < f.data.length; i++) {
-        try { await apiAdmin(() => adminApi.post('/api/listings', f.data[i])); okRows++; }
+        try {
+          const row = { ...f.data[i] };
+          /* Geocode alamat → koordinat agar listing hasil upload massal ikut tampil di peta */
+          if (HAS_MAPS_KEY && row.address && row.lat == null) {
+            try { const g = await geocodeAddress(row.address); if (g) { row.lat = g.lat; row.lng = g.lng; } } catch { /* tanpa koordinat */ }
+          }
+          await apiAdmin(() => adminApi.post('/api/listings', row)); okRows++;
+        }
         catch (e) { failed[f.n].push(L(`Row ${i + 2}: ${e.message}`, `Baris ${i + 2}: ${e.message}`)); }
       }
     }
