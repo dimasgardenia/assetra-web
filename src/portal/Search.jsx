@@ -184,10 +184,6 @@ const PortalSearch = ({ lang, onLang, onNav, listings }) => {
             />
             {q && <span onClick={() => { setQ(''); setPage(1); }} style={{ cursor: 'pointer', color: 'var(--muted)', fontSize: 14 }}>✕</span>}
           </div>
-          <div style={{ display: 'flex', border: '1px solid var(--line)', borderRadius: 8, overflow: 'hidden' }}>
-            <button onClick={() => setView('list')} style={{ padding: '9px 12px', border: 'none', background: view === 'list' ? 'var(--ink)' : '#fff', color: view === 'list' ? '#fff' : 'var(--ink)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}><PIcon name="dash" size={14} /> {t('p.search.list')}</button>
-            <button onClick={() => setView('map')} style={{ padding: '9px 12px', border: 'none', borderLeft: '1px solid var(--line)', background: view === 'map' ? 'var(--ink)' : '#fff', color: view === 'map' ? '#fff' : 'var(--ink)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}><PIcon name="pin" size={14} /> {t('p.search.map')}</button>
-          </div>
         </div>
       </div>
 
@@ -214,15 +210,6 @@ const PortalSearch = ({ lang, onLang, onNav, listings }) => {
               </select>
             </div>
           </div>
-
-          {view === 'map' && (
-            <div style={{ height: 280, borderRadius: 8, marginBottom: 20, position: 'relative', overflow: 'hidden', border: '1px solid var(--line)', background: 'linear-gradient(135deg, #e8edf5, #dce6f0)' }}>
-              <div style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(rgba(26,111,168,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(26,111,168,0.08) 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
-              {[[30, 40], [55, 30], [48, 60], [70, 50], [38, 72]].map((pos, i) => sorted[i] && (
-                <div key={i} onClick={() => onNav && onNav('detail', sorted[i])} style={{ position: 'absolute', left: pos[0] + '%', top: pos[1] + '%', background: 'var(--ink)', color: '#fff', padding: '5px 10px', borderRadius: 100, fontFamily: 'var(--mono)', fontSize: 11, fontWeight: 600, transform: 'translate(-50%,-50%)', boxShadow: '0 2px 8px rgba(0,0,0,0.2)', cursor: 'pointer' }}>{fmtRp(sorted[i].price)}</div>
-              ))}
-            </div>
-          )}
 
           {/* sponsored block — page 1 only */}
           {sponsored.length > 0 && (

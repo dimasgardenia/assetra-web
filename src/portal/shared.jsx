@@ -315,6 +315,8 @@ const AdSlot = ({ variant = 'leaderboard', bank = 'bca', placement, style }) => 
   const lx = (o) => (lang === 'id' ? o.id : o.en);
   const banners = useActiveBanners();
   const custom = placement && banners ? banners[placement] : null;
+  /* Tanpa banner unggahan admin, slot tidak ditampilkan sama sekali (tidak ada iklan contoh). */
+  if (!custom) return null;
 
   /* Admin-uploaded banner: full-bleed image, opens link + records the click. */
   if (custom) {

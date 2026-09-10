@@ -62,34 +62,30 @@ const PortalAdmin = ({ lang, onLang, onNav }) => {
   }, []);
 
   const PERSONAS = {
-    admin:  { name: 'Rina Aditya',    init: 'RA', role: L('Super Admin', 'Super Admin'),    tag: 'ADMIN',  badge: 'var(--gold)' },
-    agent:  { name: 'Bagus Santoso',  init: 'BS', role: L('Offline Agent', 'Agen Offline'), tag: 'AGENT',  badge: 'var(--teal)' },
-    owner:  { name: 'Siti Rahayu',    init: 'SR', role: L('Home Owner', 'Pemilik Properti'),tag: 'OWNER',  badge: 'var(--green)' },
+    admin:  { role: L('Super Admin', 'Super Admin'),     tag: 'ADMIN',  badge: 'var(--gold)' },
+    agent:  { role: L('Agent', 'Agen'),                  tag: 'AGENT',  badge: 'var(--teal)' },
+    owner:  { role: L('Property Owner', 'Pemilik Properti'), tag: 'OWNER',  badge: 'var(--green)' },
   };
 
   const NAV = {
     admin: [
       { id: 'dashboard', label: L('Dashboard', 'Dasbor'), icon: 'dash' },
-      { id: 'listings',  label: L('Listings', 'Listing'), icon: 'home', count: 142 },
+      { id: 'listings',  label: L('Listings', 'Listing'), icon: 'home' },
       { id: 'bulk',      label: L('Bulk Upload', 'Unggah Massal'), icon: 'doc' },
-      { id: 'ads',       label: L('Ad Campaigns', 'Kampanye Iklan'), icon: 'megaphone', count: 8 },
-      { id: 'leads',     label: L('Leads', 'Prospek'), icon: 'users', count: 47 },
-      { id: 'kpr',       label: L('KPR Applications', 'Pengajuan KPR'), icon: 'bank', count: 12 },
-      { id: 'ai',        label: L('AI Reports', 'Laporan AI'), icon: 'sparkle' },
+      { id: 'ads',       label: L('Ad Banners', 'Banner Iklan'), icon: 'megaphone' },
+      { id: 'leads',     label: L('Leads', 'Prospek'), icon: 'users' },
+      { id: 'kpr',       label: L('KPR Applications', 'Pengajuan KPR'), icon: 'bank' },
       { id: 'agents',    label: L('Agents', 'Agen'), icon: 'users' },
-      { id: 'reports',   label: L('Reports', 'Laporan'), icon: 'doc' },
     ],
     agent: [
       { id: 'mylistings', label: L('My Listings', 'Listing Saya'), icon: 'home' },
       { id: 'leads', label: L('Leads', 'Prospek'), icon: 'users' },
-      { id: 'ai',    label: L('AI Reports', 'Laporan AI'), icon: 'sparkle' },
       { id: 'agents',label: L('Agents', 'Agen'), icon: 'users' },
     ],
     /* Pemilik properti: akses & menu sama persis dengan agen. */
     owner: [
       { id: 'mylistings', label: L('My Listings', 'Listing Saya'), icon: 'home' },
       { id: 'leads', label: L('Leads', 'Prospek'), icon: 'users' },
-      { id: 'ai',    label: L('AI Consultant', 'Konsultan AI'), icon: 'sparkle' },
       { id: 'agents',label: L('Agents', 'Agen'), icon: 'users' },
     ],
   };
@@ -98,11 +94,15 @@ const PortalAdmin = ({ lang, onLang, onNav }) => {
   const [nav, setNav] = React.useState(defaultNav[realPersona]);
   const switchPersona = (p) => { setPersona(p); setNav(defaultNav[p]); };
 
-  /* Nama & inisial dari akun asli bila persona = peran sebenarnya. */
+  /* Nama & inisial selalu dari akun yang login; admin yang "melihat sebagai"
+     persona lain tetap tampil dengan namanya sendiri. */
   const realName = user?.name || user?.email || '';
-  const cur = persona === realPersona && realName
-    ? { ...PERSONAS[persona], name: realName, init: realName.trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase() }
-    : PERSONAS[persona];
+  const cur = {
+    ...PERSONAS[persona],
+    name: realName,
+    init: realName.trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase() || '?',
+    role: persona === realPersona ? PERSONAS[persona].role : L(`Viewing as ${PERSONAS[persona].role}`, `Melihat sebagai ${PERSONAS[persona].role}`),
+  };
   /* Timpa badge statis dengan hitungan nyata bila sudah termuat. */
   const navItems = NAV[persona].map(n => (counts && counts[n.id] != null ? { ...n, count: counts[n.id] } : n));
 
@@ -151,12 +151,10 @@ const PortalAdmin = ({ lang, onLang, onNav }) => {
           {nav === 'dashboard' && <AdmDash L={L} />}
           {nav === 'listings' && <AdmListings L={L} scope="all" persona={persona} onGoBulk={() => setNav('bulk')} />}
           {nav === 'mylistings' && <AdmListings L={L} scope="mine" persona={persona} me={user} onGoBulk={() => setNav('bulk')} />}
-          {nav === 'reports' && <AdmReports L={L} persona={persona} />}
           {nav === 'bulk' && <AdmBulk L={L} />}
           {nav === 'ads' && <AdmAds L={L} />}
           {nav === 'leads' && <AdmLeads L={L} persona={persona} />}
           {nav === 'kpr' && <AdmKpr L={L} />}
-          {nav === 'ai' && <AdmAI L={L} persona={persona} />}
           {nav === 'agents' && <AdmAgents L={L} persona={persona} />}
         </div>
       </div>
@@ -192,14 +190,6 @@ const ICell = () => (
 const Th = ({ children, right }) => <th style={{ textAlign: right ? 'right' : 'left', padding: '12px 16px', fontFamily: 'var(--mono)', fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--muted)', fontWeight: 600 }}>{children}</th>;
 const Td = ({ children, right, mono, bold }) => <td style={{ padding: '13px 16px', textAlign: right ? 'right' : 'left', fontFamily: mono ? 'var(--mono)' : 'inherit', fontSize: mono ? 12 : 13, fontWeight: bold ? 600 : 400, color: 'var(--ink-2)' }}>{children}</td>;
 const Card = ({ children }) => <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 10, overflow: 'hidden' }}>{children}</div>;
-
-/* Banner jujur untuk bagian yang datanya masih contoh (belum tersambung backend). */
-const DemoNotice = ({ L, note }) => (
-  <div style={{ display: 'flex', alignItems: 'center', gap: 9, background: 'rgba(212,160,23,0.10)', border: '1px solid rgba(212,160,23,0.35)', color: '#8a6d0b', borderRadius: 9, padding: '9px 13px', fontSize: 12.5, marginBottom: 16 }}>
-    <PIcon name="sparkle" size={14} />
-    <span>{note || L('Sample data — this section is illustrative and not yet connected to live data.', 'Data contoh — bagian ini bersifat ilustratif dan belum tersambung ke data langsung.')}</span>
-  </div>
-);
 
 /* ── Dashboard (admin) ── */
 /* "x menit lalu" relatif dari timestamp ms. */
@@ -465,15 +455,15 @@ const AdmListings = ({ L, scope, persona, me, onGoBulk }) => {
      yang ia buat, dari database — tanpa baris contoh). */
   const mine = scope === 'mine';
   const myName = me?.name || me?.email || '';
-  const [items, setItems] = React.useState(() => mine ? [] : ([
-    { id: 'P-0847', t: 'Menteng Heritage Townhouse', ty: 'House · Sale', price: 14_200_000_000, owner: 'Siti Rahayu', views: '12.4K', leads: 42, promo: 'Sponsored', st: 'live' },
-    { id: 'P-0823', t: 'SCBD Sky Apartment 28F', ty: 'Apartment · Sale', price: 5_350_000_000, owner: 'Andi Wijaya', views: '8.1K', leads: 28, promo: 'Featured', st: 'live' },
-    { id: 'P-0801', t: 'Canggu Beachfront Villa', ty: 'Villa · Sale', price: 12_000_000_000, owner: 'Putu Surya', views: '18.9K', leads: 61, promo: 'Sponsored', st: 'live' },
-    { id: 'P-0795', t: 'Kuningan Office Floor', ty: 'Commercial · Rent', price: 185_000_000, owner: 'Siti Rahayu', views: '3.2K', leads: 9, promo: '—', st: 'review' },
-    { id: 'P-0772', t: 'BSD Green Residence', ty: 'New · Project', price: 1_850_000_000, owner: 'Sinar Mas', views: '24.1K', leads: 132, promo: 'Featured', st: 'live' },
-    { id: 'P-0768', t: 'Pondok Indah Family Home', ty: 'House · Sale', price: 9_800_000_000, owner: 'Siti Rahayu', views: '6.7K', leads: 18, promo: '—', st: 'draft' },
-    { id: 'P-0741', t: 'Sentul Hillside Land', ty: 'Land · Sale', price: 3_400_000_000, owner: 'Siti Rahayu', views: '2.1K', leads: 5, promo: '—', st: 'live' },
-  ]));
+  const [items, setItems] = React.useState([]);
+  /* Jumlah prospek per listing (dari API prospek — hanya listing yang boleh dilihat). */
+  const [leadCounts, setLeadCounts] = React.useState({});
+  React.useEffect(() => {
+    api.get('/api/leads').then(r => {
+      const m = {}; (r.data || []).forEach(l => { if (l.listingId) m[l.listingId] = (m[l.listingId] || 0) + 1; });
+      setLeadCounts(m);
+    }).catch(() => {});
+  }, []);
   const [chip, setChip] = React.useState('all');
   const [modal, setModal] = React.useState(null); // { mode: 'new'|'edit'|'view', id? }
   const [notice, setNotice] = React.useState(null);
@@ -485,7 +475,7 @@ const AdmListings = ({ L, scope, persona, me, onGoBulk }) => {
     { k: 'review', label: L('Review', 'Tinjauan') },
     { k: 'draft', label: 'Draft' },
   ];
-  const scoped = scope === 'owner' ? items.filter(l => l.owner === 'Siti Rahayu') : items;
+  const scoped = items;
   const showOwnerCol = scope === 'all';
   const rows = scoped.filter(l =>
     chip === 'all' ? true
@@ -493,13 +483,12 @@ const AdmListings = ({ L, scope, persona, me, onGoBulk }) => {
     : l.st === chip);
 
   const kindFor = (ty) => ty.toLowerCase().includes('villa') ? 'villa' : ty.toLowerCase().includes('apart') ? 'apartment' : ty.toLowerCase().includes('commer') ? 'commercial' : ty.toLowerCase().includes('land') ? 'land' : 'property';
-  const nextId = () => 'P-' + String(Math.max(...items.map(i => parseInt(i.id.slice(2), 10))) + 1).padStart(4, '0');
 
   const openNew = () => setModal({ mode: 'new' });
   const openRow = (mode, id) => setModal({ mode, id });
   const current = modal?.id != null ? items.find(l => l.id === modal.id) : null;
   const initialForm = modal?.mode === 'new'
-    ? { t: '', ty: LISTING_TYPES[0], price: '', addr: '', beds: '', baths: '', area: '', bldArea: '', floors: '', year: '', cert: '', desc: '', fac: '', owner: scope === 'owner' ? 'Siti Rahayu' : mine ? myName : '', promo: '—', st: 'live' }
+    ? { t: '', ty: LISTING_TYPES[0], price: '', addr: '', beds: '', baths: '', area: '', bldArea: '', floors: '', year: '', cert: '', desc: '', fac: '', owner: mine ? myName : '', promo: '—', st: 'live' }
     : current ? { ...current, price: String(current.price) } : null;
 
   /* Load marketplace listings from the database so they survive refresh. */
@@ -513,7 +502,7 @@ const AdmListings = ({ L, scope, persona, me, onGoBulk }) => {
         bldArea: x.buildingArea, floors: x.floors, year: x.yearBuilt,
         cert: x.certificate || '', desc: x.description || '',
         fac: (x.facilities || []).join(', '),
-        owner: x.agentName || '—', views: '0', leads: 0,
+        owner: x.agentName || '—', leads: 0,
         promo: x.promo || '—', st: x.status,
         photos: (x.uploadedPhotos || []).map(u => ({ url: resolveFileUrl(u) })),
         fromDb: true,
@@ -553,17 +542,13 @@ const AdmListings = ({ L, scope, persona, me, onGoBulk }) => {
           files.forEach(x => fd.append('photos', x));
           await apiAdmin(() => adminApi.post(`/api/listings/${encodeURIComponent(dbId)}/photos`, fd));
         }
-        setItems(q => [{ id: dbId, ...f, price: Number(f.price), owner: f.owner || '—', views: '0', leads: 0, fromDb: true }, ...q]);
+        setItems(q => [{ id: dbId, ...f, price: Number(f.price), owner: f.owner || '—', leads: 0, fromDb: true }, ...q]);
         setNotice(L(
           `Listing "${f.t}" saved to the database (${dbId})${nPhoto ? ` with ${nPhoto} photo${nPhoto > 1 ? 's' : ''}` : ''} — now live on the public site.`,
           `Listing "${f.t}" tersimpan ke database (${dbId})${nPhoto ? ` dengan ${nPhoto} foto` : ''} — sudah tayang di situs publik.`));
       } catch (e) {
-        /* Backend unreachable — keep it locally so work isn't lost. */
-        const id = nextId();
-        setItems(q => [{ id, ...f, price: Number(f.price), owner: f.owner || '—', views: '0', leads: 0 }, ...q]);
-        setNotice(L(
-          `Saved locally only — backend error: ${e.message}. It will NOT appear on the public site.`,
-          `Hanya tersimpan lokal — backend error: ${e.message}. Listing TIDAK tayang di situs publik.`));
+        setNotice(L(`Failed to save listing: ${e.message}`, `Gagal menyimpan listing: ${e.message}`));
+        return;
       }
     } else {
       setItems(q => q.map(l => l.id === modal.id ? { ...l, ...f } : l));
@@ -593,18 +578,10 @@ const AdmListings = ({ L, scope, persona, me, onGoBulk }) => {
 
   return (
     <>
-      {scope === 'owner' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 22 }}>
-          <Kpi label={L('My listings', 'Listing saya')} val={String(scoped.length)} delta={L(`${scoped.filter(l => l.st === 'review').length} in review`, `${scoped.filter(l => l.st === 'review').length} ditinjau`)} color="var(--muted)" />
-          <Kpi label={L('Total views', 'Total dilihat')} val="24.4K" delta="▲ 9% this week" />
-          <Kpi label={L('Leads received', 'Prospek masuk')} val="74" delta="▲ 11 new" />
-          <Kpi label={L('Featured active', 'Unggulan aktif')} val="1" delta={L('Upgrade to boost', 'Upgrade untuk boost')} color="var(--gold-2)" />
-        </div>
-      )}
       <PageHead
-        title={scope === 'owner' || mine ? L('My Listings', 'Listing Saya') : L('Listings & Ad Management', 'Manajemen Listing & Iklan')}
+        title={mine ? L('My Listings', 'Listing Saya') : L('Listings', 'Manajemen Listing')}
         sub={mine ? L('Properties you listed. New listings go live on the public site immediately.', 'Properti yang Anda pasang. Listing baru langsung tayang di situs publik.')
-          : scope === 'owner' ? L('Manage your own properties. Bulk upload to publish many at once.', 'Kelola properti Anda. Unggah massal untuk publikasi sekaligus.') : L('All inventory, sponsored placements, and revenue.', 'Semua inventori, placement sponsor, dan pendapatan.')}
+          : L('All listings on the marketplace, from admins, agents, and owners.', 'Semua listing di marketplace, dari admin, agen, dan pemilik.')}
         actions={<>
           {!mine && <button className="p-btn p-btn-ghost p-btn-sm" onClick={onGoBulk}><PIcon name="doc" size={14} /> {L('Bulk upload', 'Unggah massal')}</button>}
           <button className="p-btn p-btn-primary p-btn-sm" onClick={openNew}><PIcon name="plus" size={14} /> {L('New listing', 'Listing baru')}</button>
@@ -627,7 +604,7 @@ const AdmListings = ({ L, scope, persona, me, onGoBulk }) => {
           <thead><tr style={{ background: 'var(--paper-2)' }}>
             <Th>ID</Th><Th>{L('Property', 'Properti')}</Th><Th>{L('Price', 'Harga')}</Th>
             {showOwnerCol && <Th>{L('Owner', 'Pemilik')}</Th>}
-            <Th right>Views</Th><Th right>{L('Leads', 'Prospek')}</Th><Th>Promo</Th><Th>Status</Th><Th> </Th>
+            <Th right>{L('Leads', 'Prospek')}</Th><Th>Promo</Th><Th>Status</Th><Th> </Th>
           </tr></thead>
           <tbody>
             {rows.map((l) => (
@@ -636,8 +613,7 @@ const AdmListings = ({ L, scope, persona, me, onGoBulk }) => {
                 <Td><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><div style={{ width: 36, height: 36, borderRadius: 6, overflow: 'hidden', flexShrink: 0 }}>{l.photos && l.photos.length ? <img src={l.photos[0].url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} /> : <Photo2 kind={kindFor(l.ty)} seed={l.id} w={100} />}</div><div><div style={{ fontWeight: 600 }}>{l.t}</div><div style={{ fontSize: 11, color: 'var(--muted)' }}>{l.ty}</div></div></div></Td>
                 <Td mono bold>{fmtRp(l.price)}</Td>
                 {showOwnerCol && <Td>{l.owner}</Td>}
-                <Td right mono>{l.views}</Td>
-                <Td right mono bold>{l.leads}</Td>
+                <Td right mono bold>{leadCounts[l.id] ?? 0}</Td>
                 <Td>{l.promo === '—' ? <span style={{ color: 'var(--muted)' }}>—</span> : <span style={{ fontFamily: 'var(--mono)', fontSize: 10, letterSpacing: '0.06em', padding: '3px 8px', borderRadius: 4, background: l.promo === 'Sponsored' ? 'rgba(26,111,168,0.1)' : 'rgba(176,136,56,0.12)', color: l.promo === 'Sponsored' ? 'var(--teal)' : 'var(--gold-2)' }}>{l.promo === 'Sponsored' ? '★ ' : ''}{l.promo}</span>}</Td>
                 <Td><Pill tone={l.st}>{l.st === 'live' ? '● Live' : l.st === 'review' ? L('Review', 'Tinjauan') : 'Draft'}</Pill></Td>
                 <Td right>
@@ -650,14 +626,14 @@ const AdmListings = ({ L, scope, persona, me, onGoBulk }) => {
             ))}
             {rows.length === 0 && (
               <tr style={{ borderTop: '1px solid var(--line)' }}>
-                <td colSpan={showOwnerCol ? 9 : 8} style={{ padding: '22px 18px', textAlign: 'center', fontSize: 12.5, color: 'var(--muted)' }}>{mine && !items.length ? L('You have no listings yet — tap "New listing" to publish your first property.', 'Anda belum punya listing — tekan "Listing baru" untuk memasang properti pertama.') : L('No listings match this filter.', 'Tidak ada listing untuk filter ini.')}</td>
+                <td colSpan={showOwnerCol ? 8 : 7} style={{ padding: '22px 18px', textAlign: 'center', fontSize: 12.5, color: 'var(--muted)' }}>{mine && !items.length ? L('You have no listings yet — tap "New listing" to publish your first property.', 'Anda belum punya listing — tekan "Listing baru" untuk memasang properti pertama.') : L('No listings match this filter.', 'Tidak ada listing untuk filter ini.')}</td>
               </tr>
             )}
           </tbody>
         </table>
       </Card>
       {modal && initialForm && (
-        <ListingModal L={L} mode={modal.mode} initial={initialForm} lockOwner={scope === 'owner' || mine} onClose={() => setModal(null)} onSave={saveModal} />
+        <ListingModal L={L} mode={modal.mode} initial={initialForm} lockOwner={mine} onClose={() => setModal(null)} onSave={saveModal} />
       )}
     </>
   );
@@ -690,50 +666,6 @@ const LISTING_TEMPLATE_CSV =
   'Rumah Modern Kebayoran Baru,rumah,8500000000,"Jl. Senopati No. 12, Kebayoran Baru","DKI Jakarta",250,320,4,3,SHM,2019,"Rumah 2 lantai, carport 2 mobil, dekat MRT Blok M"\n' +
   'Apartemen Studio Sudirman Park,apartemen,950000000,"Jl. KH Mas Mansyur Kav. 35, Tanah Abang","DKI Jakarta",,28,1,1,SHMSRS,2016,"Full furnished, view kota, akses langsung ke mall"\n' +
   'Kavling Siap Bangun Sentul,tanah,1200000000,"Cluster Mediterania, Sentul City, Bogor","Jawa Barat",300,,,,SHM,,"Kavling hook, kontur datar, bebas banjir"\n';
-
-const photoGuideTxt = (id) => id
-  ? `PANDUAN UNGGAH FOTO & DOKUMEN MASSAL — ASSETRA
-================================================
-
-1. Kumpulkan semua berkas dalam satu file ZIP (maks 200 MB).
-2. Format yang didukung: JPG, PNG (foto) dan PDF (dokumen legal).
-3. Penamaan file menentukan pencocokan ke listing:
-
-   <id-listing>_foto_<urutan>.jpg     → foto listing
-   <id-listing>_dok_<jenis>.pdf       → dokumen legal
-
-   Contoh:
-   AST-2026-0101_foto_01.jpg
-   AST-2026-0101_foto_02.jpg
-   AST-2026-0101_dok_shm.pdf
-   AST-2026-0101_dok_pbb.pdf
-
-4. Jika listing berasal dari CSV yang belum punya ID, gunakan
-   nomor baris CSV: BARIS-2_foto_01.jpg (baris 2 = data pertama).
-5. Foto pertama (urutan 01) dipakai sebagai foto sampul.
-6. Jenis dokumen yang dikenali: shm, hgb, imb, pbg, pbb, ajb.
-`
-  : `BULK PHOTO & DOCUMENT UPLOAD GUIDE — ASSETRA
-=============================================
-
-1. Collect all files in a single ZIP (max 200 MB).
-2. Supported formats: JPG, PNG (photos) and PDF (legal documents).
-3. File naming controls matching to listings:
-
-   <listing-id>_foto_<order>.jpg     → listing photo
-   <listing-id>_dok_<type>.pdf       → legal document
-
-   Examples:
-   AST-2026-0101_foto_01.jpg
-   AST-2026-0101_foto_02.jpg
-   AST-2026-0101_dok_shm.pdf
-   AST-2026-0101_dok_pbb.pdf
-
-4. For listings from a CSV without IDs yet, use the CSV row
-   number: BARIS-2_foto_01.jpg (row 2 = first data row).
-5. The first photo (order 01) is used as the cover photo.
-6. Recognized document types: shm, hgb, imb, pbg, pbb, ajb.
-`;
 
 /* Minimal CSV parser that understands quoted fields. */
 function parseCsv(text) {
@@ -785,22 +717,46 @@ function validateListingsCsv(rows, L) {
   return { rows: rows.length - 1, errors };
 }
 
+/* Ubah baris CSV tervalidasi → payload POST /api/listings. */
+const BULK_TYPE_MAP = {
+  rumah:     { type: 'property',   typeLabel: 'House · Sale' },
+  apartemen: { type: 'apartment',  typeLabel: 'Apartment · Sale' },
+  tanah:     { type: 'land',       typeLabel: 'Land · Sale' },
+  villa:     { type: 'villa',      typeLabel: 'Villa · Sale' },
+  ruko:      { type: 'commercial', typeLabel: 'Commercial · Sale' },
+  gudang:    { type: 'commercial', typeLabel: 'Commercial · Sale' },
+  kantor:    { type: 'commercial', typeLabel: 'Commercial · Sale' },
+};
+function csvToListings(rows) {
+  const header = rows[0].map(h => h.trim().toLowerCase());
+  const idx = Object.fromEntries(header.map((h, i) => [h, i]));
+  const g = (r, k) => (idx[k] != null ? (r[idx[k]] || '').trim() : '');
+  const num = (v) => (v === '' ? null : Number(v));
+  return rows.slice(1).filter(r =>
+    g(r, 'title') && g(r, 'address') && /^\d+$/.test(g(r, 'price_idr')) && Number(g(r, 'price_idr')) > 0 && BULK_TYPE_MAP[g(r, 'type').toLowerCase()],
+  ).map(r => {
+    const tm = BULK_TYPE_MAP[g(r, 'type').toLowerCase()];
+    return {
+      title: g(r, 'title'), type: tm.type, typeLabel: tm.typeLabel, mode: 'sale',
+      price: Number(g(r, 'price_idr')), address: g(r, 'address') || null, region: g(r, 'region') || null,
+      area: num(g(r, 'land_m2')), buildingArea: num(g(r, 'building_m2')),
+      beds: num(g(r, 'bedrooms')), baths: num(g(r, 'bathrooms')),
+      certificate: g(r, 'certificate') || null, yearBuilt: num(g(r, 'year_built')),
+      description: g(r, 'description') || null, status: 'live', source: 'portal',
+    };
+  });
+}
+
 const AdmBulk = ({ L }) => {
   const id = L('x', 'y') === 'y';
-  const [queue, setQueue] = React.useState([
-    { n: 'menteng-townhouse.csv', rows: 1, st: 'ok', errors: [] },
-    { n: 'jakarta-portfolio-12units.xlsx', rows: 12, st: 'ok', errors: [] },
-    { n: 'photos-batch-bsd.zip', rows: 48, st: 'processing', errors: [] },
-  ]);
+  const [queue, setQueue] = React.useState([]);
+  const [publishing, setPublishing] = React.useState(false);
   const [notice, setNotice] = React.useState(null);
   const [expanded, setExpanded] = React.useState(null);
   const listingInput = React.useRef(null);
-  const zipInput = React.useRef(null);
 
   const downloadListingTemplate = () =>
     downloadFile('assetra-template-listing.csv', LISTING_TEMPLATE_CSV, 'text/csv;charset=utf-8');
-  const downloadPhotoGuide = () =>
-    downloadFile(id ? 'assetra-panduan-foto-dokumen.txt' : 'assetra-photo-doc-guide.txt', photoGuideTxt(id), 'text/plain;charset=utf-8');
 
   /* Accepts File objects from either the picker or drag & drop. */
   const handleListingFiles = (files) => {
@@ -808,25 +764,15 @@ const AdmBulk = ({ L }) => {
       if (/\.csv$/i.test(f.name)) {
         const reader = new FileReader();
         reader.onload = () => {
-          const { rows, errors } = validateListingsCsv(parseCsv(String(reader.result)), L);
-          setQueue(q => [...q, { n: f.name, rows, st: errors.length ? 'error' : 'ok', errors }]);
+          const parsed = parseCsv(String(reader.result));
+          const { rows, errors } = validateListingsCsv(parsed, L);
+          /* Baris valid tetap bisa diterbitkan; baris bermasalah dilaporkan. */
+          const data = rows > 0 && !errors.some(e => /Kolom wajib hilang|Missing columns/.test(e)) ? csvToListings(parsed) : [];
+          setQueue(q => [...q, { n: f.name, rows, valid: data.length, st: data.length ? 'ok' : 'error', errors, data }]);
         };
         reader.readAsText(f);
-      } else if (/\.(xlsx|xls)$/i.test(f.name)) {
-        /* XLSX is parsed server-side after upload — queue it as processing. */
-        setQueue(q => [...q, { n: f.name, rows: '—', st: 'processing', errors: [] }]);
       } else {
-        setQueue(q => [...q, { n: f.name, rows: '—', st: 'error', errors: [L('Unsupported format — use CSV or XLSX', 'Format tidak didukung — gunakan CSV atau XLSX')] }]);
-      }
-    }
-  };
-
-  const handleZipFiles = (files) => {
-    for (const f of files) {
-      if (/\.zip$/i.test(f.name)) {
-        setQueue(q => [...q, { n: f.name, rows: '—', st: 'processing', errors: [] }]);
-      } else {
-        setQueue(q => [...q, { n: f.name, rows: '—', st: 'error', errors: [L('Not a ZIP — compress photos/documents into one .zip first', 'Bukan ZIP — kompres foto/dokumen jadi satu file .zip dulu')] }]);
+        setQueue(q => [...q, { n: f.name, rows: '—', st: 'error', errors: [L('Unsupported format — use the CSV template', 'Format tidak didukung — gunakan template CSV')] }]);
       }
     }
   };
@@ -838,7 +784,6 @@ const AdmBulk = ({ L }) => {
       : L(`${files.length} files uploaded — check their status in the queue below.`, `${files.length} berkas berhasil diunggah — cek statusnya di antrean bawah.`));
   };
   const onListingFile = (e) => { const fs = Array.from(e.target.files || []); handleListingFiles(fs); queueNotice(fs); e.target.value = ''; };
-  const onZipFile = (e) => { const fs = Array.from(e.target.files || []); handleZipFiles(fs); queueNotice(fs); e.target.value = ''; };
 
   /* Drag & drop onto the dashed cards */
   const [dragIdx, setDragIdx] = React.useState(null);
@@ -847,34 +792,45 @@ const AdmBulk = ({ L }) => {
     setDragIdx(null);
     const files = Array.from(e.dataTransfer?.files || []);
     if (!files.length) return;
-    (i === 0 ? handleListingFiles : handleZipFiles)(files);
+    handleListingFiles(files);
     queueNotice(files);
   };
 
-  const publishValid = () => {
-    const count = queue.filter(f => f.st === 'ok').length;
-    if (!count) { setNotice(L('Nothing valid to publish yet.', 'Belum ada berkas valid untuk dipublikasikan.')); return; }
-    setQueue(q => q.map(f => f.st === 'ok' ? { ...f, st: 'published' } : f));
-    setNotice(L(`${count} file(s) published — listings go live after review.`, `${count} berkas dipublikasikan — listing tayang setelah ditinjau.`));
+  /* Terbitkan: setiap baris CSV yang valid dikirim ke API → listing tayang di situs. */
+  const publishValid = async () => {
+    const ready = queue.filter(f => f.st === 'ok');
+    if (!ready.length) { setNotice(L('Nothing valid to publish yet.', 'Belum ada berkas valid untuk dipublikasikan.')); return; }
+    setPublishing(true);
+    let okRows = 0; const failed = {};
+    for (const f of ready) {
+      failed[f.n] = [];
+      for (let i = 0; i < f.data.length; i++) {
+        try { await apiAdmin(() => adminApi.post('/api/listings', f.data[i])); okRows++; }
+        catch (e) { failed[f.n].push(L(`Row ${i + 2}: ${e.message}`, `Baris ${i + 2}: ${e.message}`)); }
+      }
+    }
+    setQueue(q => q.map(f => f.st === 'ok'
+      ? (failed[f.n]?.length ? { ...f, st: 'error', errors: failed[f.n] } : { ...f, st: 'published' })
+      : f));
+    setPublishing(false);
+    const nFail = Object.values(failed).reduce((s, a) => s + a.length, 0);
+    setNotice(nFail
+      ? L(`${okRows} listing(s) published, ${nFail} row(s) failed — see details.`, `${okRows} listing terbit, ${nFail} baris gagal — lihat detail.`)
+      : L(`${okRows} listing(s) published and live on the public site.`, `${okRows} listing terbit dan sudah tayang di situs publik.`));
   };
 
   const cards = [
-    { ic: 'doc', t: L('Listings (CSV / XLSX)', 'Listing (CSV / XLSX)'),
-      s: L('Up to 500 rows · required columns: title, type, price_idr, address', 'Maks 500 baris · kolom wajib: title, type, price_idr, address'),
+    { ic: 'doc', t: L('Listings (CSV)', 'Listing (CSV)'),
+      s: L('Up to 500 rows · required columns: title, type, price_idr, address. Add photos afterwards via Listings → Edit.', 'Maks 500 baris · kolom wajib: title, type, price_idr, address. Foto ditambahkan setelahnya lewat Listing → Edit.'),
       pick: () => listingInput.current?.click(), tpl: downloadListingTemplate,
       tplLabel: L('Download CSV template', 'Unduh template CSV') },
-    { ic: 'cam', t: L('Photos & documents (ZIP)', 'Foto & dokumen (ZIP)'),
-      s: L('JPG / PNG / PDF · matched to listings by filename / ID', 'JPG / PNG / PDF · dicocokkan ke listing via nama file / ID'),
-      pick: () => zipInput.current?.click(), tpl: downloadPhotoGuide,
-      tplLabel: L('Download naming guide', 'Unduh panduan penamaan') },
   ];
 
   return (
     <>
-      <PageHead title={L('Bulk Upload', 'Unggah Massal')} sub={L('Upload many listings & photos at once. They publish to the public site after review.', 'Unggah banyak listing & foto sekaligus. Tayang ke situs publik setelah ditinjau.')} />
-      <input ref={listingInput} type="file" accept=".csv,.xlsx,.xls" style={{ display: 'none' }} onChange={onListingFile} />
-      <input ref={zipInput} type="file" accept=".zip" style={{ display: 'none' }} onChange={onZipFile} />
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 22 }}>
+      <PageHead title={L('Bulk Upload', 'Unggah Massal')} sub={L('Upload many listings at once from a CSV file. Valid rows go live on the public site when you publish.', 'Unggah banyak listing sekaligus dari file CSV. Baris yang valid tayang di situs publik saat dipublikasikan.')} />
+      <input ref={listingInput} type="file" accept=".csv" style={{ display: 'none' }} onChange={onListingFile} />
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 16, marginBottom: 22 }}>
         {cards.map((d, i) => (
           <div key={i}
             onDragOver={e => { e.preventDefault(); setDragIdx(i); }}
@@ -902,7 +858,7 @@ const AdmBulk = ({ L }) => {
       <Card>
         <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ fontFamily: 'var(--serif)', fontSize: 17 }}>{L('Upload queue', 'Antrean unggahan')}</span>
-          <button className="p-btn p-btn-primary p-btn-sm" onClick={publishValid}><PIcon name="check" size={14} /> {L('Publish all valid', 'Publikasikan yang valid')}</button>
+          <button className="p-btn p-btn-primary p-btn-sm" disabled={publishing} onClick={publishValid}><PIcon name="check" size={14} /> {publishing ? L('Publishing…', 'Menerbitkan…') : L('Publish all valid', 'Publikasikan yang valid')}</button>
         </div>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead><tr style={{ background: 'var(--paper-2)' }}><Th>{L('File', 'Berkas')}</Th><Th right>{L('Records', 'Catatan')}</Th><Th>Status</Th><Th> </Th></tr></thead>
@@ -910,16 +866,16 @@ const AdmBulk = ({ L }) => {
             {queue.map((f, i) => (
               <React.Fragment key={i}>
                 <tr style={{ borderTop: '1px solid var(--line)' }}>
-                  <Td><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><PIcon name={/\.zip$/i.test(f.n) ? 'cam' : 'doc'} size={16} /> <span style={{ fontWeight: 600 }}>{f.n}</span></div></Td>
+                  <Td><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><PIcon name="doc" size={16} /> <span style={{ fontWeight: 600 }}>{f.n}</span></div></Td>
                   <Td right mono>{f.rows}</Td>
                   <Td>
-                    {f.st === 'ok' ? <Pill tone="live">✓ {L('Ready', 'Siap')}</Pill>
+                    {f.st === 'ok' ? <Pill tone={f.errors?.length ? 'review' : 'live'}>✓ {f.valid}/{f.rows} {L('ready', 'siap')}{f.errors?.length ? ` · ${f.errors.length} ${L('skipped', 'dilewati')}` : ''}</Pill>
                       : f.st === 'published' ? <Pill tone="live">✓ {L('Published', 'Terbit')}</Pill>
                       : f.st === 'processing' ? <Pill tone="review">{L('Processing', 'Memproses')}…</Pill>
                       : <Pill tone="hot">✕ {f.errors.length} {L('errors', 'error')}</Pill>}
                   </Td>
                   <Td right>
-                    {f.st === 'error' && (
+                    {f.errors?.length > 0 && (
                       <span className="p-link" style={{ fontSize: 11, cursor: 'pointer' }} onClick={() => setExpanded(expanded === i ? null : i)}>
                         {expanded === i ? L('Hide', 'Tutup') : L('Details', 'Detail')}
                       </span>
@@ -952,8 +908,6 @@ const AdmBulk = ({ L }) => {
 };
 
 /* ── Ad Campaigns (admin) ── */
-const AD_TYPES = ['Featured', 'Display CPM', 'Developer', 'Sponsored search'];
-/* Penempatan banner di situs publik + ukuran gambar yang disarankan. */
 const BANNER_PLACEMENTS = [
   { id: 'home-leaderboard',   nEn: 'Home — Leaderboard',        nId: 'Beranda — Leaderboard',        size: '1400 × 160 px' },
   { id: 'home-box',           nEn: 'Home — Side Box',           nId: 'Beranda — Kotak Samping',      size: '720 × 760 px' },
@@ -963,23 +917,6 @@ const BANNER_PLACEMENTS = [
 ];
 
 const AdmAds = ({ L }) => {
-  const [camps, setCamps] = React.useState([
-    ['Menteng — Featured', 'Featured', 'Rp 500k/d', '420K', '3.4%', 312, 'live'],
-    ['Bali Villa Banner', 'Display CPM', 'Rp 1.2 jt/d', '680K', '2.7%', 408, 'live'],
-    ['BSD Microsite', 'Developer', 'Rp 2 jt/d', '140K', '4.4%', 172, 'live'],
-    ['Kuningan Sponsored', 'Sponsored search', 'Rp 300k/d', '—', '—', 0, 'draft'],
-  ]);
-  const [open, setOpen] = React.useState(false);
-  const [f, setF] = React.useState({ name: '', type: AD_TYPES[0], budget: '' });
-  const valid = f.name.trim() && Number(f.budget) > 0;
-  const save = () => {
-    if (!valid) return;
-    const budget = Number(f.budget) >= 1_000_000 ? `Rp ${(Number(f.budget) / 1_000_000).toLocaleString('id-ID')} jt/d` : `Rp ${Math.round(Number(f.budget) / 1000)}k/d`;
-    setCamps(q => [[f.name, f.type, budget, '—', '—', 0, 'draft'], ...q]);
-    setF({ name: '', type: AD_TYPES[0], budget: '' });
-    setOpen(false);
-  };
-
   /* ── Banner per penempatan (tersimpan di database) ── */
   const [banners, setBanners] = React.useState([]);      // semua banner (aktif + riwayat)
   const [bModal, setBModal] = React.useState(null);      // placement id yang sedang diatur
@@ -1036,7 +973,7 @@ const AdmAds = ({ L }) => {
     try {
       await apiAdmin(() => adminApi.del(`/api/banners/${cur.id}`));
       loadBanners();
-      setBNotice(L('Banner removed — the slot shows the default demo ad again.', 'Banner dihapus — slot kembali menampilkan iklan demo bawaan.'));
+      setBNotice(L('Banner removed — the slot is now hidden on the public site.', 'Banner dihapus — slot disembunyikan di situs publik.'));
     } catch (e) {
       setBNotice(L(`Failed to remove: ${e.message}`, `Gagal menghapus: ${e.message}`));
     }
@@ -1045,32 +982,11 @@ const AdmAds = ({ L }) => {
 
   return (
     <>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 22 }}>
-        <Kpi label={L('Impressions', 'Impresi')} val="1.24 jt" delta="▲ 18%" />
-        <Kpi label={L('Clicks', 'Klik')} val="38,400" delta="▲ 12%" />
-        <Kpi label="CTR" val="3.1%" delta="▲ 0.4pp" />
-        <Kpi label={L('Ad spend', 'Belanja iklan')} val="Rp 42 jt" delta="8 advertisers" color="var(--muted)" />
-      </div>
-      <PageHead title={L('Ad Campaigns', 'Kampanye Iklan')} sub={L('Display, featured, and sponsored placements across the portal.', 'Display, unggulan, dan sponsor di seluruh portal.')} actions={<button className="p-btn p-btn-primary p-btn-sm" onClick={() => setOpen(true)}><PIcon name="plus" size={14} /> {L('New campaign', 'Kampanye baru')}</button>} />
-      <Card>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead><tr style={{ background: 'var(--paper-2)' }}><Th>{L('Campaign', 'Kampanye')}</Th><Th>{L('Type', 'Tipe')}</Th><Th right>{L('Budget', 'Anggaran')}</Th><Th right>Impr.</Th><Th right>CTR</Th><Th right>{L('Leads', 'Prospek')}</Th><Th>Status</Th></tr></thead>
-          <tbody>
-            {camps.map((c, i) => (
-              <tr key={i} style={{ borderTop: '1px solid var(--line)' }}>
-                <Td bold>{c[0]}</Td><Td>{c[1]}</Td><Td right mono>{c[2]}</Td><Td right mono>{c[3]}</Td><Td right mono>{c[4]}</Td><Td right mono bold>{c[5]}</Td>
-                <Td><Pill tone={c[6] === 'live' ? 'live' : 'draft'}>{c[6] === 'live' ? '● Live' : c[6] === 'draft' ? 'Draft' : 'Paused'}</Pill></Td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </Card>
-
       {/* ── Banner per penempatan ── */}
-      <div style={{ marginTop: 28 }}>
+      <div>
         <PageHead
-          title={L('Placement Banners', 'Banner Penempatan')}
-          sub={L('Upload a custom banner per ad slot on the public site. Clicking it opens your link and is counted below.', 'Unggah banner khusus untuk tiap slot iklan di situs publik. Klik pengunjung membuka tautan Anda dan dihitung di bawah.')}
+          title={L('Ad Banners', 'Banner Iklan')}
+          sub={L('Upload a banner per ad slot on the public site. Empty slots are hidden. Clicks open your link and are counted below.', 'Unggah banner untuk tiap slot iklan di situs publik. Slot kosong disembunyikan. Klik pengunjung membuka tautan Anda dan dihitung di bawah.')}
         />
         {bNotice && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, padding: '11px 16px', borderRadius: 10, background: 'rgba(45,138,111,0.08)', border: '1px solid rgba(45,138,111,0.3)', fontSize: 12.5, color: 'var(--ink-2)' }}>
@@ -1094,7 +1010,7 @@ const AdmAds = ({ L }) => {
                     <Td>
                       {cur
                         ? <img src={resolveFileUrl(cur.imagePath)} alt="" style={{ width: 96, height: 34, objectFit: 'cover', borderRadius: 5, border: '1px solid var(--line)', display: 'block' }} />
-                        : <span style={{ fontSize: 12, color: 'var(--muted)' }}>{L('Default demo ad', 'Iklan demo bawaan')}</span>}
+                        : <span style={{ fontSize: 12, color: 'var(--muted)' }}>{L('Empty — slot hidden', 'Kosong — slot disembunyikan')}</span>}
                     </Td>
                     <Td>
                       {cur
@@ -1102,7 +1018,7 @@ const AdmAds = ({ L }) => {
                         : <span style={{ color: 'var(--muted)' }}>—</span>}
                     </Td>
                     <Td right mono bold>{cur ? totalClicks(p.id).toLocaleString('id-ID') : '—'}</Td>
-                    <Td>{cur ? <Pill tone="live">● Live</Pill> : <Pill tone="draft">Demo</Pill>}</Td>
+                    <Td>{cur ? <Pill tone="live">● Live</Pill> : <Pill tone="draft">{L('Empty', 'Kosong')}</Pill>}</Td>
                     <Td right>
                       <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
                         <button className="p-btn p-btn-cyan p-btn-sm" onClick={() => openBannerModal(p.id)}><PIcon name="edit" size={13} /> {L('Set banner', 'Atur banner')}</button>
@@ -1152,28 +1068,7 @@ const AdmAds = ({ L }) => {
           </div>
         </Modal>
       )}
-      {open && (
-        <Modal title={L('New Campaign', 'Kampanye Baru')} onClose={() => setOpen(false)}>
-          <FieldRow label={L('Campaign name *', 'Nama kampanye *')}>
-            <input style={inputStyle} value={f.name} onChange={e => setF({ ...f, name: e.target.value })} placeholder={L('e.g. Kemang House — Featured', 'cth. Rumah Kemang — Unggulan')} />
-          </FieldRow>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <FieldRow label={L('Type', 'Tipe')}>
-              <select style={inputStyle} value={f.type} onChange={e => setF({ ...f, type: e.target.value })}>
-                {AD_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-              </select>
-            </FieldRow>
-            <FieldRow label={L('Budget / day (IDR) *', 'Anggaran / hari (Rp) *')}>
-              <input style={inputStyle} type="number" min="0" value={f.budget} onChange={e => setF({ ...f, budget: e.target.value })} placeholder="500000" />
-            </FieldRow>
-          </div>
-          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 4 }}>
-            <button className="p-btn p-btn-ghost p-btn-sm" onClick={() => setOpen(false)}>{L('Cancel', 'Batal')}</button>
-            <button className="p-btn p-btn-primary p-btn-sm" disabled={!valid} style={!valid ? { opacity: 0.5, cursor: 'default' } : undefined} onClick={save}><PIcon name="check" size={14} /> {L('Create draft', 'Buat draf')}</button>
-          </div>
-        </Modal>
-      )}
-    </>
+          </>
   );
 };
 
@@ -1245,17 +1140,11 @@ const AdmLeads = ({ L, persona }) => {
 };
 
 /* ── KPR Applications (admin + agent) ── */
-const DEMO_KPR = [
-  { name: 'Hendra Gunawan', prop: 'Menteng Townhouse', loan: 11_360_000_000, bank: 'Bank Mandiri', dp: '20%', st: 'review', phone: null, dbId: null },
-  { name: 'Maria Tanuwijaya', prop: 'SCBD Apartment', loan: 4_280_000_000, bank: 'BCA', dp: '20%', st: 'approved', phone: null, dbId: null },
-  { name: 'Rudi Salim', prop: 'BSD Residence', loan: 1_480_000_000, bank: 'BNI', dp: '20%', st: 'submitted', phone: null, dbId: null },
-];
-
 const AdmKpr = ({ L }) => {
-  const [apps, setApps] = React.useState(DEMO_KPR);
+  const [apps, setApps] = React.useState([]);
   const [sel, setSel] = React.useState(null); // index of app opened in detail modal
 
-  /* Muat pengajuan nyata dari database (di atas data demo). */
+  /* Muat pengajuan dari database. */
   React.useEffect(() => {
     apiAdmin(() => adminApi.get('/api/kpr')).then(r => {
       const rows = (r.data || []).map(a => ({
@@ -1270,7 +1159,7 @@ const AdmKpr = ({ L }) => {
         dp: a.propertyPrice && a.downPayment ? `${Math.round(a.downPayment / a.propertyPrice * 100)}%` : '—',
         st: a.status,
       }));
-      setApps([...rows, ...DEMO_KPR]);
+      setApps(rows);
     }).catch(() => {});
   }, []);
   const tone = { approved: 'live', review: 'review', submitted: 'new', rejected: 'hot' };
@@ -1278,16 +1167,19 @@ const AdmKpr = ({ L }) => {
   return (
     <>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 22 }}>
-        <Kpi label={L('Applications', 'Pengajuan')} val="12" delta="▲ 4 this week" />
-        <Kpi label={L('Approved', 'Disetujui')} val="7" delta="58% rate" color="var(--green)" />
-        <Kpi label={L('In review', 'Dalam tinjauan')} val="3" delta={L('Awaiting bank', 'Menunggu bank')} color="var(--gold-2)" />
-        <Kpi label={L('Total financed', 'Total dibiayai')} val="Rp 34 M" delta="▲ 22% MoM" />
+        <Kpi label={L('Applications', 'Pengajuan')} val={String(apps.length)} delta={L(`${apps.filter(a => a.st === 'submitted').length} new`, `${apps.filter(a => a.st === 'submitted').length} baru`)} />
+        <Kpi label={L('Approved', 'Disetujui')} val={String(apps.filter(a => a.st === 'approved').length)} delta={apps.length ? `${Math.round(apps.filter(a => a.st === 'approved').length / apps.length * 100)}%` : '—'} color="var(--green)" />
+        <Kpi label={L('In review', 'Dalam tinjauan')} val={String(apps.filter(a => a.st === 'review').length)} delta={L('Awaiting bank', 'Menunggu bank')} color="var(--gold-2)" />
+        <Kpi label={L('Total financed', 'Total dibiayai')} val={fmtRp(apps.filter(a => a.st === 'approved').reduce((t, a) => t + (a.loan || 0), 0))} delta={L('approved loans', 'pinjaman disetujui')} />
       </div>
       <PageHead title={L('KPR Applications', 'Pengajuan KPR')} sub={L('Mortgage pre-approvals routed to partner banks.', 'Pra-persetujuan KPR diteruskan ke bank mitra.')} />
       <Card>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead><tr style={{ background: 'var(--paper-2)' }}><Th>{L('Applicant', 'Pemohon')}</Th><Th>{L('Property', 'Properti')}</Th><Th right>{L('Loan amount', 'Jumlah pinjaman')}</Th><Th>{L('Bank', 'Bank')}</Th><Th>DP</Th><Th>Status</Th><Th right> </Th></tr></thead>
           <tbody>
+            {apps.length === 0 && (
+              <tr style={{ borderTop: '1px solid var(--line)' }}><td colSpan={7} style={{ padding: '22px 18px', textAlign: 'center', fontSize: 12.5, color: 'var(--muted)' }}>{L('No applications yet — they arrive from the Financing page.', 'Belum ada pengajuan — pengajuan masuk dari halaman Pembiayaan.')}</td></tr>
+            )}
             {apps.map((a, i) => (
               <tr key={i} style={{ borderTop: '1px solid var(--line)' }}>
                 <Td bold>{a.name}</Td><Td>{a.prop}</Td><Td right mono bold>{fmtRp(a.loan)}</Td><Td>{a.bank}</Td><Td mono>{a.dp}</Td>
@@ -1332,85 +1224,6 @@ const AdmKpr = ({ L }) => {
     </>
   );
 };
-
-/* ── AI Reports / Consultant (all personas) ── */
-const AdmAI = ({ L, persona }) => {
-  const [reports, setReports] = React.useState([
-    { prop: 'Kuningan Office · 1,200m²', use: L('Office → Boutique hotel', 'Kantor → Hotel butik'), yield: '4.1% → 9.6%', capex: 'Rp 18 M', st: 'live' },
-    { prop: 'Menteng Townhouse · 420m²', use: L('Home → Serviced apartment', 'Rumah → Apartemen layanan'), yield: '5.2% → 7.3%', capex: 'Rp 6 M', st: 'live' },
-    { prop: 'Sentul Land · 1,500m²', use: L('Vacant → Cluster housing', 'Kosong → Perumahan klaster'), yield: '— → 14.1% IRR', capex: 'Rp 42 M', st: 'review' },
-  ]);
-  const [ask, setAsk] = React.useState(false);
-  const [q, setQ] = React.useState('');
-  const submitAnalysis = () => {
-    if (!q.trim()) return;
-    setReports(r => [{ prop: q.trim().slice(0, 48), use: L('Analyzing…', 'Menganalisis…'), yield: '—', capex: '—', st: 'review' }, ...r]);
-    setQ('');
-    setAsk(false);
-  };
-  const downloadReport = (r) => downloadFile(
-    'assetra-ai-analysis.txt',
-    `ASSETRA — ${L('AI HIGHEST-AND-BEST-USE ANALYSIS', 'ANALISIS PENGGUNAAN TERBAIK AI')}\n${'='.repeat(48)}\n\n` +
-    `${L('Property', 'Properti')}: ${r.prop}\n${L('Recommended use', 'Penggunaan disarankan')}: ${r.use}\n` +
-    `${L('Yield uplift', 'Kenaikan imbal hasil')}: ${r.yield}\n${L('Estimated capex', 'Estimasi capex')}: ${r.capex}\n` +
-    `Status: ${r.st === 'live' ? L('Complete', 'Selesai') : L('Generating', 'Membuat')}\n\n` +
-    L('Note: demo report. Connect ANTHROPIC_API_KEY for full AI-generated analyses.',
-      'Catatan: laporan demo. Hubungkan ANTHROPIC_API_KEY untuk analisis AI lengkap.') + '\n',
-    'text/plain;charset=utf-8');
-  return (
-    <>
-      <DemoNotice L={L} note={L('Sample analyses — live AI reports are generated on the public AI Consultant page.', 'Analisis contoh — laporan AI langsung dibuat di halaman Konsultan AI publik.')} />
-      <PageHead title={persona === 'owner' ? L('AI Consultant', 'Konsultan AI') : L('AI Reports', 'Laporan AI')} sub={persona === 'owner' ? L('Discover the highest-and-best use for your properties.', 'Temukan penggunaan terbaik untuk properti Anda.') : L('Highest-and-best-use analyses generated for clients.', 'Analisis penggunaan terbaik yang dibuat untuk klien.')} actions={<button className="p-btn p-btn-cyan p-btn-sm" onClick={() => setAsk(true)}><PIcon name="sparkle" size={14} /> {L('New analysis', 'Analisis baru')}</button>} />
-      {/* AI prompt card */}
-      <div style={{ background: 'linear-gradient(135deg, #0A1640, #14306B)', borderRadius: 12, padding: 22, color: '#fff', marginBottom: 22, display: 'flex', gap: 16, alignItems: 'center' }}>
-        <div style={{ width: 44, height: 44, borderRadius: 11, background: 'var(--brand-gradient)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><PIcon name="sparkle" size={22} /></div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 3 }}>{L('Ask the AI about any property', 'Tanya AI tentang properti apa pun')}</div>
-          <div style={{ fontSize: 12.5, color: 'rgba(250,250,247,0.7)' }}>{L('e.g. "Convert my 3-floor office in Kuningan into something higher-yield"', 'cth. "Ubah kantor 3 lantai saya di Kuningan jadi yang lebih cuan"')}</div>
-        </div>
-        <button className="p-btn p-btn-cyan p-btn-sm" onClick={() => setAsk(true)}>{L('Start', 'Mulai')} <PIcon name="arrowR" size={14} /></button>
-      </div>
-      <Card>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead><tr style={{ background: 'var(--paper-2)' }}><Th>{L('Property', 'Properti')}</Th><Th>{L('Recommended use', 'Penggunaan disarankan')}</Th><Th>{L('Yield uplift', 'Kenaikan imbal hasil')}</Th><Th right>{L('Est. capex', 'Est. capex')}</Th><Th>Status</Th><Th right> </Th></tr></thead>
-          <tbody>
-            {reports.map((r, i) => (
-              <tr key={i} style={{ borderTop: '1px solid var(--line)' }}>
-                <Td bold>{r.prop}</Td><Td>{r.use}</Td>
-                <Td><span style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--green)', fontWeight: 600 }}>{r.yield}</span></Td>
-                <Td right mono>{r.capex}</Td>
-                <Td><Pill tone={r.st}>{r.st === 'live' ? L('Complete', 'Selesai') : L('Generating', 'Membuat')}…</Pill></Td>
-                <Td right><button className="p-btn p-btn-ghost p-btn-sm" onClick={() => downloadReport(r)}><PIcon name="doc" size={13} /> {L('Report', 'Laporan')}</button></Td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </Card>
-      {ask && (
-        <Modal title={L('New AI Analysis', 'Analisis AI Baru')} onClose={() => setAsk(false)} width={500}>
-          <FieldRow label={L('Describe the property & your goal *', 'Deskripsikan properti & tujuan Anda *')}>
-            <textarea value={q} onChange={e => setQ(e.target.value)} rows={4}
-              placeholder={L('e.g. Convert my 3-floor office in Kuningan into something higher-yield', 'cth. Ubah kantor 3 lantai saya di Kuningan jadi yang lebih cuan')}
-              style={{ ...inputStyle, height: 'auto', padding: '10px 12px', resize: 'vertical', lineHeight: 1.5 }} />
-          </FieldRow>
-          <div style={{ fontSize: 11.5, color: 'var(--muted)', marginBottom: 14 }}>{L('The analysis appears in the table below as "Generating" and completes after review.', 'Analisis akan muncul di tabel sebagai "Membuat" dan selesai setelah ditinjau.')}</div>
-          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-            <button className="p-btn p-btn-ghost p-btn-sm" onClick={() => setAsk(false)}>{L('Cancel', 'Batal')}</button>
-            <button className="p-btn p-btn-primary p-btn-sm" disabled={!q.trim()} style={!q.trim() ? { opacity: 0.5, cursor: 'default' } : undefined} onClick={submitAnalysis}><PIcon name="sparkle" size={14} /> {L('Run analysis', 'Jalankan analisis')}</button>
-          </div>
-        </Modal>
-      )}
-    </>
-  );
-};
-
-/* ── Agents (admin + agent) ── */
-/* Avatar agen: foto bila ada, jika tidak fallback inisial gradient. */
-const AgentAvatar = ({ name, photo, size = 44 }) => (
-  photo
-    ? <img src={photo} alt={name} style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', display: 'block', flexShrink: 0 }} />
-    : <div style={{ width: size, height: size, borderRadius: '50%', background: 'var(--brand-gradient)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--mono)', fontWeight: 600, flexShrink: 0 }}>{String(name || '?').split(' ').map(w => w[0]).slice(0, 2).join('')}</div>
-);
 
 const AdmAgents = ({ L, persona }) => {
   const [agents, setAgents] = React.useState([]);
@@ -1587,230 +1400,4 @@ const ReportBtn = ({ L, rows, filename = 'assetra-report', label }) => {
 };
 
 /* ── Owner Ad Performance ── */
-const OWNER_PROPS = ['Menteng Heritage Townhouse', 'Kuningan Office Floor', 'Pondok Indah Family Home', 'Sentul Hillside Land'];
-const AdmOwnerAds = ({ L }) => {
-  const [camps, setCamps] = React.useState([
-    { name: L('Menteng Townhouse — Featured', 'Rumah Menteng — Unggulan'), type: 'Featured', spend: 4_500_000, impr: '128K', clk: '4.2K', ctr: '3.3%', leads: 38, st: 'live' },
-    { name: L('Pondok Indah Home — Spotlight', 'Rumah Pondok Indah — Sorotan'), type: 'Sponsored', spend: 2_800_000, impr: '74K', clk: '2.1K', ctr: '2.8%', leads: 16, st: 'live' },
-    { name: L('Sentul Land — Boost', 'Tanah Sentul — Boost'), type: 'Featured', spend: 1_200_000, impr: '21K', clk: '480', ctr: '2.3%', leads: 4, st: 'ended' },
-  ]);
-  const [open, setOpen] = React.useState(false);
-  const [f, setF] = React.useState({ prop: OWNER_PROPS[0], type: 'Featured', budget: '' });
-  const valid = Number(f.budget) > 0;
-  const save = () => {
-    if (!valid) return;
-    setCamps(q => [{ name: `${f.prop} — ${f.type === 'Featured' ? L('Featured', 'Unggulan') : 'Sponsor'}`, type: f.type, spend: Number(f.budget), impr: '—', clk: '—', ctr: '—', leads: 0, st: 'live' }, ...q]);
-    setF({ prop: OWNER_PROPS[0], type: 'Featured', budget: '' });
-    setOpen(false);
-  };
-  const reportRows = [
-    ['Campaign', 'Type', 'Spend (Rp)', 'Impressions', 'Clicks', 'CTR', 'Leads', 'Status'],
-    ...camps.map(c => [c.name, c.type, c.spend, c.impr, c.clk, c.ctr, c.leads, c.st]),
-  ];
-  return (
-    <>
-      <DemoNotice L={L} />
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 22 }}>
-        <Kpi label={L('Total impressions', 'Total impresi')} val="223K" delta="▲ 14% this week" />
-        <Kpi label={L('Total clicks', 'Total klik')} val="6,780" delta="▲ 9%" />
-        <Kpi label={L('Leads from ads', 'Prospek dari iklan')} val="58" delta="▲ 12 new" />
-        <Kpi label={L('Ad spend (MTD)', 'Belanja iklan (MTD)')} val="Rp 8.5 jt" delta={L('of Rp 12 jt budget', 'dari anggaran Rp 12 jt')} color="var(--muted)" />
-      </div>
-      <PageHead
-        title={L('Ad Performance', 'Performa Iklan')}
-        sub={L('How your featured & sponsored placements are performing.', 'Performa placement unggulan & sponsor Anda.')}
-        actions={<>
-          <ReportBtn L={L} rows={reportRows} filename="ad-performance" />
-          <button className="p-btn p-btn-cyan p-btn-sm" onClick={() => setOpen(true)}><PIcon name="plus" size={14} /> {L('Boost a listing', 'Boost listing')}</button>
-        </>}
-      />
-      {open && (
-        <Modal title={L('Boost a Listing', 'Boost Listing')} onClose={() => setOpen(false)}>
-          <FieldRow label={L('Listing', 'Listing')}>
-            <select style={inputStyle} value={f.prop} onChange={e => setF({ ...f, prop: e.target.value })}>
-              {OWNER_PROPS.map(p => <option key={p} value={p}>{p}</option>)}
-            </select>
-          </FieldRow>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <FieldRow label={L('Placement', 'Penempatan')}>
-              <select style={inputStyle} value={f.type} onChange={e => setF({ ...f, type: e.target.value })}>
-                <option value="Featured">{L('Featured', 'Unggulan')}</option>
-                <option value="Sponsored">Sponsored</option>
-              </select>
-            </FieldRow>
-            <FieldRow label={L('Budget (IDR) *', 'Anggaran (Rp) *')}>
-              <input style={inputStyle} type="number" min="0" value={f.budget} onChange={e => setF({ ...f, budget: e.target.value })} placeholder="1500000" />
-            </FieldRow>
-          </div>
-          {valid && <div style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--teal)', margin: '-6px 0 12px' }}>= {fmtRp(Number(f.budget))}</div>}
-          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-            <button className="p-btn p-btn-ghost p-btn-sm" onClick={() => setOpen(false)}>{L('Cancel', 'Batal')}</button>
-            <button className="p-btn p-btn-primary p-btn-sm" disabled={!valid} style={!valid ? { opacity: 0.5, cursor: 'default' } : undefined} onClick={save}><PIcon name="check" size={14} /> {L('Start boost', 'Mulai boost')}</button>
-          </div>
-        </Modal>
-      )}
-      {/* performance over time bars */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 16, marginBottom: 22 }}>
-        <Card>
-          <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--line)', fontFamily: 'var(--serif)', fontSize: 17 }}>{L('Impressions · last 7 days', 'Impresi · 7 hari terakhir')}</div>
-          <div style={{ padding: 20, display: 'flex', alignItems: 'flex-end', gap: 10, height: 160 }}>
-            {[42, 55, 38, 68, 74, 60, 88].map((h, i) => (
-              <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-                <div style={{ width: '100%', height: h + '%', background: 'var(--brand-gradient)', borderRadius: '4px 4px 0 0' }} />
-                <span style={{ fontFamily: 'var(--mono)', fontSize: 9, color: 'var(--muted)' }}>{['M', 'T', 'W', 'T', 'F', 'S', 'S'][i]}</span>
-              </div>
-            ))}
-          </div>
-        </Card>
-        <Card>
-          <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--line)', fontFamily: 'var(--serif)', fontSize: 17 }}>{L('Spend vs. leads', 'Belanja vs. prospek')}</div>
-          <div style={{ padding: 18 }}>
-            {[[L('Featured', 'Unggulan'), 68, 'var(--teal)'], [L('Sponsored', 'Sponsor'), 42, 'var(--gold)'], [L('Organic (free)', 'Organik (gratis)'), 90, 'var(--green)']].map((r, i) => (
-              <div key={i} style={{ marginBottom: 14 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, marginBottom: 5 }}><span>{r[0]}</span><span style={{ fontFamily: 'var(--mono)', fontWeight: 600 }}>{r[1]} {L('leads', 'prospek')}</span></div>
-                <div style={{ height: 7, background: 'var(--paper-2)', borderRadius: 4, overflow: 'hidden' }}><div style={{ width: r[1] + '%', height: '100%', background: r[2] }} /></div>
-              </div>
-            ))}
-          </div>
-        </Card>
-      </div>
-      <Card>
-        <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--line)', fontFamily: 'var(--serif)', fontSize: 17 }}>{L('My campaigns', 'Kampanye saya')}</div>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead><tr style={{ background: 'var(--paper-2)' }}><Th>{L('Campaign', 'Kampanye')}</Th><Th>{L('Type', 'Tipe')}</Th><Th right>{L('Spend', 'Belanja')}</Th><Th right>Impr.</Th><Th right>{L('Clicks', 'Klik')}</Th><Th right>CTR</Th><Th right>{L('Leads', 'Prospek')}</Th><Th>Status</Th></tr></thead>
-          <tbody>
-            {camps.map((c, i) => (
-              <tr key={i} style={{ borderTop: '1px solid var(--line)' }}>
-                <Td bold>{c.name}</Td>
-                <Td>{c.type === 'Featured' ? <span style={{ fontFamily: 'var(--mono)', fontSize: 10, padding: '3px 8px', borderRadius: 4, background: 'rgba(176,136,56,0.12)', color: 'var(--gold-2)' }}>{c.type}</span> : <span style={{ fontFamily: 'var(--mono)', fontSize: 10, padding: '3px 8px', borderRadius: 4, background: 'rgba(26,111,168,0.1)', color: 'var(--teal)' }}>★ {c.type}</span>}</Td>
-                <Td right mono bold>{fmtRp(c.spend)}</Td>
-                <Td right mono>{c.impr}</Td>
-                <Td right mono>{c.clk}</Td>
-                <Td right mono>{c.ctr}</Td>
-                <Td right mono bold>{c.leads}</Td>
-                <Td><Pill tone={c.st === 'live' ? 'live' : 'draft'}>{c.st === 'live' ? '● Live' : L('Ended', 'Selesai')}</Pill></Td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </Card>
-    </>
-  );
-};
-
-/* ── Reports hub (downloadable) ── */
-const AdmReports = ({ L, persona }) => {
-  const adminReports = [
-    { ic: 'bank', t: L('Revenue & ad billing', 'Pendapatan & tagihan iklan'), s: L('All advertiser invoices, featured spend, subscriptions', 'Semua invoice pengiklan, belanja unggulan, langganan'), period: L('Monthly', 'Bulanan'), rows: [['Channel', 'Revenue (Rp)', 'MoM'], ['Featured listings', 525000000, '+18%'], ['Display ads', 203000000, '+12%'], ['Subscriptions', 84000000, '+6%'], ['Sponsored search', 35000000, '+22%']], file: 'revenue' },
-    { ic: 'home', t: L('Listings inventory', 'Inventori listing'), s: L('Every listing, status, owner, views & leads', 'Setiap listing, status, pemilik, dilihat & prospek'), period: L('Live', 'Langsung'), rows: [['ID', 'Property', 'Price', 'Status', 'Leads'], ['P-0847', 'Menteng Townhouse', 14200000000, 'live', 42], ['P-0823', 'SCBD Apartment', 5350000000, 'live', 28]], file: 'listings' },
-    { ic: 'users', t: L('Leads & conversion', 'Prospek & konversi'), s: L('Inbound enquiries, source, agent, status', 'Pertanyaan masuk, sumber, agen, status'), period: L('Weekly', 'Mingguan'), rows: [['Buyer', 'Property', 'Source', 'Status'], ['Hendra G.', 'Menteng', 'WhatsApp', 'hot']], file: 'leads' },
-    { ic: 'bank', t: L('KPR pipeline', 'Pipeline KPR'), s: L('Applications, banks, approval rate, financed value', 'Pengajuan, bank, tingkat persetujuan, nilai dibiayai'), period: L('Monthly', 'Bulanan'), rows: [['Applicant', 'Bank', 'Loan', 'Status'], ['Hendra G.', 'Mandiri', 11360000000, 'review']], file: 'kpr' },
-    { ic: 'sparkle', t: L('AI consultancy log', 'Log konsultasi AI'), s: L('Highest-and-best-use analyses & yield uplift', 'Analisis penggunaan terbaik & kenaikan imbal hasil'), period: L('Live', 'Langsung'), rows: [['Property', 'Use', 'Yield uplift'], ['Kuningan Office', 'Hotel', '4.1→9.6%']], file: 'ai-reports' },
-    { ic: 'megaphone', t: L('Ad performance', 'Performa iklan'), s: L('Impressions, clicks, CTR & spend per campaign', 'Impresi, klik, CTR & belanja per kampanye'), period: L('Weekly', 'Mingguan'), rows: [['Campaign', 'Impr', 'CTR', 'Leads'], ['Menteng Featured', '420K', '3.4%', 312]], file: 'ad-performance' },
-  ];
-  const ownerReports = adminReports.filter(r => ['listings', 'leads', 'ai-reports', 'ad-performance'].includes(r.file));
-  const reports = persona === 'owner' ? ownerReports : adminReports;
-  const [period, setPeriod] = React.useState(2);
-  const [preview, setPreview] = React.useState(null);   // report being previewed
-  const [sched, setSched] = React.useState(false);
-  const [schedF, setSchedF] = React.useState({ report: reports[0]?.file || '', freq: 'weekly', email: '' });
-  const [notice, setNotice] = React.useState(null);
-  const saveSchedule = () => {
-    if (!/.+@.+\..+/.test(schedF.email)) return;
-    const r = reports.find(x => x.file === schedF.report);
-    setNotice(L(
-      `Scheduled: "${r?.t}" will be emailed ${schedF.freq} to ${schedF.email}.`,
-      `Terjadwal: "${r?.t}" akan dikirim ${schedF.freq === 'daily' ? 'harian' : schedF.freq === 'weekly' ? 'mingguan' : 'bulanan'} ke ${schedF.email}.`));
-    setSched(false);
-  };
-
-  return (
-    <>
-      <DemoNotice L={L} />
-      <PageHead
-        title={L('Reports', 'Laporan')}
-        sub={L('Download any report as CSV. Schedule recurring exports to email.', 'Unduh laporan apa pun sebagai CSV. Jadwalkan ekspor berkala ke email.')}
-        actions={<button className="p-btn p-btn-ghost p-btn-sm" onClick={() => setSched(true)}><PIcon name="bell" size={14} /> {L('Schedule', 'Jadwalkan')}</button>}
-      />
-      {notice && (
-        <div style={{ marginBottom: 16, padding: '11px 16px', borderRadius: 10, background: 'rgba(45,138,111,0.08)', border: '1px solid rgba(45,138,111,0.3)', fontSize: 12.5, color: 'var(--ink-2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span>✓ {notice}</span>
-          <span style={{ cursor: 'pointer', color: 'var(--muted)' }} onClick={() => setNotice(null)}>✕</span>
-        </div>
-      )}
-      {/* date range bar */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 20, alignItems: 'center' }}>
-        <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--muted)', letterSpacing: '0.06em' }}>{L('PERIOD', 'PERIODE')}</span>
-        {[L('Today', 'Hari ini'), L('This week', 'Minggu ini'), L('This month', 'Bulan ini'), L('Quarter', 'Kuartal'), L('Custom', 'Kustom')].map((c, i) => <span key={c} className={`p-chip ${i === period ? 'active' : ''}`} onClick={() => setPeriod(i)} style={{ fontSize: 12, padding: '6px 12px', cursor: 'pointer' }}>{c}</span>)}
-        <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--muted)', marginLeft: 'auto' }}>{L('Format', 'Format')}: <b style={{ color: 'var(--ink)' }}>CSV</b> · XLSX · PDF</span>
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-        {reports.map((r, i) => (
-          <div key={i} style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 12, padding: 22, display: 'flex', flexDirection: 'column' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
-              <div style={{ width: 42, height: 42, borderRadius: 10, background: 'rgba(26,111,168,0.1)', color: 'var(--teal)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><PIcon name={r.ic} size={20} /></div>
-              <span style={{ fontFamily: 'var(--mono)', fontSize: 9, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--muted)', border: '1px solid var(--line)', padding: '2px 7px', borderRadius: 4 }}>{r.period}</span>
-            </div>
-            <h3 style={{ fontFamily: 'var(--serif)', fontWeight: 500, fontSize: 19, margin: '0 0 6px' }}>{r.t}</h3>
-            <p style={{ fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.5, margin: '0 0 16px', flex: 1 }}>{r.s}</p>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button className="p-btn p-btn-cyan p-btn-sm" style={{ flex: 1 }} onClick={() => {
-                const csv = r.rows.map(row => row.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
-                const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
-                a.download = 'assetra-' + r.file + '-' + new Date().toISOString().slice(0, 10) + '.csv'; a.click();
-              }}><PIcon name="doc" size={14} /> {L('Download CSV', 'Unduh CSV')}</button>
-              <button className="p-btn p-btn-ghost p-btn-sm" title={L('Preview', 'Pratinjau')} onClick={() => setPreview(r)}><PIcon name="eye" size={14} /></button>
-            </div>
-          </div>
-        ))}
-      </div>
-      {preview && (
-        <Modal title={preview.t} onClose={() => setPreview(null)} width={560}>
-          <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>{preview.s} · {preview.period}</div>
-          <div style={{ border: '1px solid var(--line)', borderRadius: 10, overflow: 'hidden', marginBottom: 16 }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead><tr style={{ background: 'var(--paper-2)' }}>{preview.rows[0].map((h, i) => <Th key={i}>{h}</Th>)}</tr></thead>
-              <tbody>
-                {preview.rows.slice(1).map((row, i) => (
-                  <tr key={i} style={{ borderTop: '1px solid var(--line)' }}>
-                    {row.map((c, j) => <Td key={j} mono={typeof c === 'number'}>{typeof c === 'number' && c > 1000000 ? fmtRp(c) : String(c)}</Td>)}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <button className="p-btn p-btn-ghost p-btn-sm" onClick={() => setPreview(null)}>{L('Close', 'Tutup')}</button>
-          </div>
-        </Modal>
-      )}
-      {sched && (
-        <Modal title={L('Schedule Report', 'Jadwalkan Laporan')} onClose={() => setSched(false)}>
-          <FieldRow label={L('Report', 'Laporan')}>
-            <select style={inputStyle} value={schedF.report} onChange={e => setSchedF({ ...schedF, report: e.target.value })}>
-              {reports.map(r => <option key={r.file} value={r.file}>{r.t}</option>)}
-            </select>
-          </FieldRow>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <FieldRow label={L('Frequency', 'Frekuensi')}>
-              <select style={inputStyle} value={schedF.freq} onChange={e => setSchedF({ ...schedF, freq: e.target.value })}>
-                <option value="daily">{L('Daily', 'Harian')}</option>
-                <option value="weekly">{L('Weekly', 'Mingguan')}</option>
-                <option value="monthly">{L('Monthly', 'Bulanan')}</option>
-              </select>
-            </FieldRow>
-            <FieldRow label={L('Email to *', 'Kirim ke email *')}>
-              <input style={inputStyle} type="email" value={schedF.email} onChange={e => setSchedF({ ...schedF, email: e.target.value })} placeholder="nama@perusahaan.co.id" />
-            </FieldRow>
-          </div>
-          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 4 }}>
-            <button className="p-btn p-btn-ghost p-btn-sm" onClick={() => setSched(false)}>{L('Cancel', 'Batal')}</button>
-            <button className="p-btn p-btn-primary p-btn-sm" disabled={!/.+@.+\..+/.test(schedF.email)} style={!/.+@.+\..+/.test(schedF.email) ? { opacity: 0.5, cursor: 'default' } : undefined} onClick={saveSchedule}><PIcon name="bell" size={14} /> {L('Schedule', 'Jadwalkan')}</button>
-          </div>
-        </Modal>
-      )}
-    </>
-  );
-};
-
 export default PortalAdmin;

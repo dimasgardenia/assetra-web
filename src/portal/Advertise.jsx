@@ -11,7 +11,16 @@ const PortalAdvertise = ({ lang, onLang, onNav }) => {
   const { t } = useT();
   const id = lang === 'id';
   const isMobile = useIsMobile();
-  const [view, setView] = React.useState('tiers');
+  /* Angka nyata dari API: listing tayang & agen aktif. */
+  const [stats, setStats] = React.useState({ listings: '…', agents: '…' });
+  React.useEffect(() => {
+    let on = true;
+    Promise.all([
+      api.get('/api/listings?source=portal&per_page=1').then(r => r.meta?.total ?? 0).catch(() => 0),
+      api.get('/api/agents').then(r => (r.data || []).filter(a => a.status === 'live').length).catch(() => 0),
+    ]).then(([listings, agents]) => { if (on) setStats({ listings: listings.toLocaleString('id-ID'), agents: agents.toLocaleString('id-ID') }); });
+    return () => { on = false; };
+  }, []);
   const user = useUser();
   const isVerified = !!user && !!user.emailVerified;
   const needsVerify = !!user && !user.emailVerified;
@@ -61,23 +70,14 @@ const PortalAdvertise = ({ lang, onLang, onNav }) => {
           <h1 style={{ fontFamily: 'var(--serif)', fontWeight: 500, fontSize: 42, letterSpacing: '-0.02em', margin: '8px 0 10px' }}>{t('p.adv.title')}</h1>
           <p style={{ fontSize: 17, color: 'rgba(255,255,255,0.9)', maxWidth: 560, margin: '0 0 24px' }}>{t('p.adv.sub')}</p>
           <div style={{ display: 'flex', gap: 36 }}>
-            {[['8M', id ? 'Pengunjung/bln' : 'Visitors/mo'], ['12.4K', id ? 'Agen aktif' : 'Active agents'], ['184K', id ? 'Listing' : 'Listings']].map((s, i) => (
+            {[[stats.listings, id ? 'Listing aktif' : 'Active listings'], [stats.agents, id ? 'Agen aktif' : 'Active agents']].map((s, i) => (
               <div key={i}><div style={{ fontFamily: 'var(--serif)', fontSize: 30 }}>{s[0]}</div><div style={{ fontFamily: 'var(--mono)', fontSize: 11, opacity: 0.8, letterSpacing: '0.06em', textTransform: 'uppercase' }}>{s[1]}</div></div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* tab switch */}
-      <div className="pwrap" style={{ paddingTop: 28 }}>
-        <div style={{ display: 'inline-flex', border: '1px solid var(--line)', borderRadius: 10, overflow: 'hidden', background: '#fff' }}>
-          {[['tiers', t('p.adv.tiers')], ['dash', t('p.adv.dash')]].map(([id2, label]) => (
-            <button key={id2} onClick={() => setView(id2)} style={{ padding: '11px 22px', border: 'none', background: view === id2 ? 'var(--ink)' : '#fff', color: view === id2 ? '#fff' : 'var(--ink)', fontFamily: 'var(--sans)', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>{label}</button>
-          ))}
-        </div>
-      </div>
-
-      {view === 'tiers' && (
+      {(
         <div className="pwrap" style={{ padding: '24px 32px 56px' }}>
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, 1fr)', gap: 16 }}>
             {tiers.map(tr => (
@@ -114,63 +114,6 @@ const PortalAdvertise = ({ lang, onLang, onNav }) => {
                 </div>
               </div>
             ))}
-          </div>
-        </div>
-      )}
-
-      {view === 'dash' && (
-        <div className="pwrap" style={{ padding: '24px 32px 56px' }}>
-          {/* KPIs */}
-          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(5, 1fr)', gap: 14, marginBottom: 24 }}>
-            {[
-              [t('p.adv.impressions'), '1,24 jt', '▲ 18%'], [t('p.adv.clicks'), '38,400', '▲ 12%'], [t('p.adv.ctr'), '3.1%', '▲ 0.4pp'], [t('p.adv.leads'), '892', '▲ 22%'], [t('p.adv.spend'), 'Rp 42 jt', ''],
-            ].map((k, i) => (
-              <div key={i} style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 10, padding: 18 }}>
-                <div style={{ fontFamily: 'var(--mono)', fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 8 }}>{k[0]}</div>
-                <div style={{ fontFamily: 'var(--serif)', fontSize: 26 }}>{k[1]}</div>
-                {k[2] && <div style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--green)', marginTop: 4 }}>{k[2]}</div>}
-              </div>
-            ))}
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 500, fontSize: 24, margin: 0 }}>{t('p.adv.campaigns')}</h2>
-            <button className="p-btn p-btn-cyan" onClick={() => openWA(id ? 'Halo Assetra, saya ingin membuat kampanye iklan baru. Mohon dibantu.' : 'Hi Assetra, I would like to set up a new ad campaign. Please assist.')}><PIcon name="plus" size={15} /> {t('p.adv.newCampaign')}</button>
-          </div>
-
-          <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 12, overflow: 'hidden' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13.5 }}>
-              <thead>
-                <tr style={{ background: 'var(--paper-2)' }}>
-                  {['Campaign', 'Type', t('p.adv.budget'), t('p.adv.impressions'), t('p.adv.clicks'), t('p.adv.ctr'), t('p.adv.leads'), 'Status'].map((h, i) => (
-                    <th key={i} style={{ textAlign: i > 1 && i < 7 ? 'right' : 'left', padding: '13px 16px', fontFamily: 'var(--mono)', fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--muted)', fontWeight: 600 }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {[
-                  { name: 'Menteng Heritage — Featured', type: 'Featured listing', budget: 'Rp 500k/d', imp: '420K', clk: '14.2K', ctr: '3.4%', leads: 312, st: 'live' },
-                  { name: 'Bali Villa Display Banner', type: 'Display CPM', budget: 'Rp 1,2 jt/d', imp: '680K', clk: '18.1K', ctr: '2.7%', leads: 408, st: 'live' },
-                  { name: 'BSD New Project Microsite', type: 'Developer', budget: 'Rp 2 jt/d', imp: '140K', clk: '6.1K', ctr: '4.4%', leads: 172, st: 'live' },
-                  { name: 'Kuningan Office Sponsored', type: 'Sponsored search', budget: 'Rp 300k/d', imp: '—', clk: '—', ctr: '—', leads: 0, st: 'paused' },
-                ].map((c, i) => (
-                  <tr key={i} style={{ borderTop: '1px solid var(--line)' }}>
-                    <td style={{ padding: '15px 16px', fontWeight: 600 }}>{c.name}</td>
-                    <td style={{ padding: '15px 16px', color: 'var(--ink-2)' }}>{c.type}</td>
-                    <td style={{ padding: '15px 16px', textAlign: 'right', fontFamily: 'var(--mono)' }}>{c.budget}</td>
-                    <td style={{ padding: '15px 16px', textAlign: 'right', fontFamily: 'var(--mono)' }}>{c.imp}</td>
-                    <td style={{ padding: '15px 16px', textAlign: 'right', fontFamily: 'var(--mono)' }}>{c.clk}</td>
-                    <td style={{ padding: '15px 16px', textAlign: 'right', fontFamily: 'var(--mono)' }}>{c.ctr}</td>
-                    <td style={{ padding: '15px 16px', textAlign: 'right', fontFamily: 'var(--mono)', fontWeight: 600 }}>{c.leads}</td>
-                    <td style={{ padding: '15px 16px' }}>
-                      <span style={{ fontFamily: 'var(--mono)', fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', padding: '4px 8px', borderRadius: 4, background: c.st === 'live' ? 'rgba(45,138,111,0.1)' : 'var(--paper-2)', color: c.st === 'live' ? 'var(--green)' : 'var(--muted)', border: c.st === 'live' ? '1px solid rgba(45,138,111,0.3)' : '1px solid var(--line)' }}>
-                        {c.st === 'live' ? '● Live' : 'Paused'}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
           </div>
         </div>
       )}
