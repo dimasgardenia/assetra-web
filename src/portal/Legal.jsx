@@ -4,7 +4,7 @@ import React from 'react';
 import { PortalNav, PortalFooter } from './shared';
 
 const CONTACT_EMAIL = 'landassetra@gmail.com';
-const COMPANY = 'PT Assetra Properti Nusantara';
+const COMPANY = 'PT. Assetra Prosper Capital';
 const UPDATED = '10 September 2026';
 
 const PRIVACY = {
