@@ -24,7 +24,6 @@ const EditModal = ({ field, lang, user, onClose, onDone }) => {
   const [value, setValue] = React.useState('');
   const [curPw, setCurPw] = React.useState('');
   const [otp, setOtp] = React.useState('');
-  const [demo, setDemo] = React.useState('');
   const [channel, setChannel] = React.useState(FIELD_META[field].channel);
   const [busy, setBusy] = React.useState(false);
   const [err, setErr] = React.useState('');
@@ -46,8 +45,9 @@ const EditModal = ({ field, lang, user, onClose, onDone }) => {
     setBusy(true);
     try {
       const r = await api.post('/api/account/change/request', { field, value: value.trim(), currentPassword: curPw || undefined });
+      /* Nomor telepon diterapkan langsung (tanpa OTP WhatsApp). */
+      if (r.data?.applied) { onDone(r.data.user); return; }
       setChannel(r.data.channel);
-      if (r.data.demo?.otp) { setDemo(r.data.demo.otp); setOtp(r.data.demo.otp); }
       setStep('otp');
     } catch (e) { setErr(e?.message || L('Failed to send code', 'Gagal mengirim kode')); }
     finally { setBusy(false); }
@@ -100,7 +100,7 @@ const EditModal = ({ field, lang, user, onClose, onDone }) => {
             )}
             <p style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.5, margin: '4px 0 16px' }}>
               {field === 'phone'
-                ? L('A verification code will be sent to the new number via WhatsApp.', 'Kode verifikasi akan dikirim ke nomor baru via WhatsApp.')
+                ? L('The new number is saved immediately.', 'Nomor baru langsung disimpan.')
                 : field === 'email'
                 ? L('A code will be sent to your current email to confirm. The new email must then be verified.', 'Kode dikirim ke email lama untuk konfirmasi. Email baru wajib diverifikasi ulang.')
                 : L('A verification code will be sent to your email.', 'Kode verifikasi akan dikirim ke email Anda.')}
@@ -118,7 +118,6 @@ const EditModal = ({ field, lang, user, onClose, onDone }) => {
             <p style={{ fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.55, margin: '0 0 14px' }}>
               {L(`Enter the 6-digit code sent via ${chLabel}.`, `Masukkan kode 6 digit yang dikirim via ${chLabel}.`)}
             </p>
-            {demo && <div style={{ background: 'rgba(212,160,23,0.1)', border: '1px solid rgba(212,160,23,0.35)', color: '#8a6d0b', borderRadius: 8, padding: '8px 12px', fontSize: 12, marginBottom: 12 }}>{L('Demo mode — your code:', 'Mode demo — kode Anda:')} <b style={{ fontFamily: 'var(--mono)' }}>{demo}</b></div>}
             <input style={{ ...inp, fontFamily: 'var(--mono)', fontSize: 22, letterSpacing: 8, textAlign: 'center' }} value={otp} onChange={e => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="000000" inputMode="numeric" maxLength={6} />
             {err && <div style={errS}>{err}</div>}
             <div style={rowEnd}>
