@@ -105,6 +105,8 @@ function AdminGuard(props) {
     if (!authReady) return;
     if (!user) { setState('denied'); return; }
     if (user.role === 'admin') { setState('allowed'); return; }
+    /* Pemilik properti terverifikasi langsung boleh masuk (tanpa persetujuan admin). */
+    if (user.accountType === 'owner' && user.emailVerified) { setState('allowed'); return; }
     if (user.accountType === 'agent' && user.emailVerified) {
       let on = true;
       api.get('/api/agents/me')
@@ -122,7 +124,7 @@ function AdminGuard(props) {
     return (
       <div style={{ minHeight: '70vh', display: 'flex', flexDirection: 'column', gap: 14, alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: 24, fontFamily: 'var(--sans, sans-serif)' }}>
         <div style={{ fontFamily: 'var(--serif, Georgia)', fontSize: 26, color: 'var(--ink, #0A1640)' }}>Akses ditolak</div>
-        <div style={{ color: 'var(--muted, #667)', fontSize: 14, maxWidth: 380, lineHeight: 1.6 }}>Panel admin hanya untuk admin atau agen terverifikasi. Silakan masuk dengan akun yang sesuai.</div>
+        <div style={{ color: 'var(--muted, #667)', fontSize: 14, maxWidth: 380, lineHeight: 1.6 }}>Dasbor hanya untuk admin, agen terverifikasi, atau pemilik properti yang sudah memverifikasi email. Silakan masuk dengan akun yang sesuai.</div>
         <div style={{ display: 'flex', gap: 10 }}>
           <a href="/" style={{ textDecoration: 'none' }}><button className="p-btn p-btn-ghost">Ke beranda</button></a>
           <a href="/auth" style={{ textDecoration: 'none' }}><button className="p-btn p-btn-cyan">Masuk</button></a>

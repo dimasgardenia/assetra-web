@@ -40,14 +40,14 @@ async function apiAdmin(fn) {
 const PortalAdmin = ({ lang, onLang, onNav }) => {
   const id = lang === 'id';
   const L = (en, idt) => (id ? idt : en);
-  /* Persona mengikuti akun yang login: admin → semua menu; selain itu (agen
-     terverifikasi yang lolos AdminGuard) → menu agen. Hanya admin yang boleh
-     "melihat sebagai" persona lain. */
+  /* Persona mengikuti akun yang login: admin → semua menu; pemilik properti
+     terverifikasi → persona owner; agen terverifikasi → persona agent (keduanya
+     memakai menu yang sama). Hanya admin yang boleh "melihat sebagai" persona lain. */
   const user = useUser();
   const isAdmin = user?.role === 'admin';
-  const realPersona = isAdmin ? 'admin' : 'agent';
+  const realPersona = isAdmin ? 'admin' : user?.accountType === 'owner' ? 'owner' : 'agent';
   const [persona, setPersona] = React.useState(realPersona);
-  React.useEffect(() => { if (!isAdmin && persona !== 'agent') { setPersona('agent'); setNav('mylistings'); } }, [isAdmin]); // eslint-disable-line react-hooks/exhaustive-deps
+  React.useEffect(() => { if (!isAdmin && persona !== realPersona) { setPersona(realPersona); setNav('mylistings'); } }, [isAdmin, realPersona]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* Badge sidebar dari data nyata (bukan angka statis). */
   const [counts, setCounts] = React.useState(null);
@@ -85,12 +85,13 @@ const PortalAdmin = ({ lang, onLang, onNav }) => {
       { id: 'ai',    label: L('AI Reports', 'Laporan AI'), icon: 'sparkle' },
       { id: 'agents',label: L('Agents', 'Agen'), icon: 'users' },
     ],
+    /* Pemilik properti: akses & menu sama persis dengan agen. */
     owner: [
-      { id: 'mylistings', label: L('My Listings', 'Listing Saya'), icon: 'home', count: 4 },
-      { id: 'ownerads',   label: L('Ad Performance', 'Performa Iklan'), icon: 'megaphone', count: 2 },
-      { id: 'bulk',       label: L('Bulk Upload', 'Unggah Massal'), icon: 'doc' },
-      { id: 'ai',         label: L('AI Consultant', 'Konsultan AI'), icon: 'sparkle' },
-      { id: 'reports',    label: L('Reports', 'Laporan'), icon: 'doc' },
+      { id: 'mylistings', label: L('My Listings', 'Listing Saya'), icon: 'home' },
+      { id: 'leads', label: L('Leads', 'Prospek'), icon: 'users' },
+      { id: 'kpr',   label: L('KPR Applications', 'Pengajuan KPR'), icon: 'bank' },
+      { id: 'ai',    label: L('AI Consultant', 'Konsultan AI'), icon: 'sparkle' },
+      { id: 'agents',label: L('Agents', 'Agen'), icon: 'users' },
     ],
   };
 
@@ -150,8 +151,7 @@ const PortalAdmin = ({ lang, onLang, onNav }) => {
         <div style={{ padding: 28, overflowY: 'auto' }}>
           {nav === 'dashboard' && <AdmDash L={L} />}
           {nav === 'listings' && <AdmListings L={L} scope="all" persona={persona} onGoBulk={() => setNav('bulk')} />}
-          {nav === 'mylistings' && <AdmListings L={L} scope={persona === 'owner' ? 'owner' : 'mine'} persona={persona} me={user} onGoBulk={() => setNav('bulk')} />}
-          {nav === 'ownerads' && <AdmOwnerAds L={L} />}
+          {nav === 'mylistings' && <AdmListings L={L} scope="mine" persona={persona} me={user} onGoBulk={() => setNav('bulk')} />}
           {nav === 'reports' && <AdmReports L={L} persona={persona} />}
           {nav === 'bulk' && <AdmBulk L={L} />}
           {nav === 'ads' && <AdmAds L={L} />}

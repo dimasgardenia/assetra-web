@@ -83,7 +83,8 @@ const PortalNav = ({ active, lang, onLang, onNav }) => {
     api.get('/api/agents/me').then(r => { if (on && r.data?.status === 'live') setIsLiveAgent(true); }).catch(() => {});
     return () => { on = false; };
   }, [user?.id, user?.accountType, user?.emailVerified]);
-  const canAdmin = !!user && (user.role === 'admin' || isLiveAgent);
+  const isVerifiedOwner = !!user && user.accountType === 'owner' && !!user.emailVerified;
+  const canAdmin = !!user && (user.role === 'admin' || isLiveAgent || isVerifiedOwner);
   const firstName = (user?.name || user?.email || '').split(/[\s@]/)[0];
   const initials = (user?.name || user?.email || '?').trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase();
   const links = [
@@ -137,11 +138,11 @@ const PortalNav = ({ active, lang, onLang, onNav }) => {
                     onMouseEnter={e => e.currentTarget.style.background = 'var(--paper-2)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                     <PIcon name="gear" size={15} /> {lang === 'id' ? 'Pengaturan' : 'Settings'}
                   </div>
-                  {/* Admin Panel — admin atau agen terverifikasi. */}
+                  {/* Dasbor — admin, agen terverifikasi, atau pemilik properti terverifikasi. */}
                   {canAdmin && (
                     <div onClick={() => { setMenuOpen(false); onNav && onNav('admin'); }} style={{ padding: '11px 15px', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 9, color: 'var(--ink-2)' }}
                       onMouseEnter={e => e.currentTarget.style.background = 'var(--paper-2)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                      <PIcon name="dash" size={15} /> {lang === 'id' ? 'Admin Panel' : 'Admin Panel'}
+                      <PIcon name="dash" size={15} /> {user.role === 'admin' ? 'Admin Panel' : (lang === 'id' ? 'Dasbor Saya' : 'My Dashboard')}
                     </div>
                   )}
                   <div onClick={() => { setMenuOpen(false); actions.logout(); onNav && onNav('home'); }} style={{ padding: '11px 15px', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 9, color: 'var(--red, #C14545)', borderTop: '1px solid var(--line-2)' }}
