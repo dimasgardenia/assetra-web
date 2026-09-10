@@ -81,7 +81,6 @@ const PortalAdmin = ({ lang, onLang, onNav }) => {
     agent: [
       { id: 'mylistings', label: L('My Listings', 'Listing Saya'), icon: 'home' },
       { id: 'leads', label: L('Leads', 'Prospek'), icon: 'users' },
-      { id: 'kpr',   label: L('KPR Applications', 'Pengajuan KPR'), icon: 'bank' },
       { id: 'ai',    label: L('AI Reports', 'Laporan AI'), icon: 'sparkle' },
       { id: 'agents',label: L('Agents', 'Agen'), icon: 'users' },
     ],
@@ -89,7 +88,6 @@ const PortalAdmin = ({ lang, onLang, onNav }) => {
     owner: [
       { id: 'mylistings', label: L('My Listings', 'Listing Saya'), icon: 'home' },
       { id: 'leads', label: L('Leads', 'Prospek'), icon: 'users' },
-      { id: 'kpr',   label: L('KPR Applications', 'Pengajuan KPR'), icon: 'bank' },
       { id: 'ai',    label: L('AI Consultant', 'Konsultan AI'), icon: 'sparkle' },
       { id: 'agents',label: L('Agents', 'Agen'), icon: 'users' },
     ],
@@ -1209,7 +1207,7 @@ const AdmLeads = ({ L, persona }) => {
         <Kpi label={L('Awaiting follow-up', 'Menunggu tindak lanjut')} val={loading ? '…' : String(openCount)} delta={L('status: new', 'status: baru')} color="var(--red)" />
         <Kpi label={L('Closed', 'Selesai')} val={loading ? '…' : String(leads.filter(l => l.status === 'closed').length)} delta={L('completed', 'tuntas')} color="var(--muted)" />
       </div>
-      <PageHead title={L('Leads', 'Prospek')} sub={persona === 'agent' ? L('Buyers assigned to you. Respond fast to convert.', 'Pembeli yang ditugaskan ke Anda. Respons cepat untuk konversi.') : L('Inbound enquiries auto-captured from contact buttons across the site.', 'Pertanyaan masuk yang tertangkap otomatis dari tombol kontak di seluruh situs.')} actions={<button className="p-btn p-btn-ghost p-btn-sm" onClick={() => downloadFile('assetra-leads.csv', '\uFEFFname,phone,property,source,status,created_at\n' + leads.map(l => `"${l.name || ''}","${l.phone || ''}","${l.listingTitle || ''}",${l.type},${l.status},${new Date(l.createdAt).toISOString()}`).join('\n') + '\n', 'text/csv;charset=utf-8')}><PIcon name="globe" size={14} /> {L('Export', 'Ekspor')}</button>} />
+      <PageHead title={L('Leads', 'Prospek')} sub={persona !== 'admin' ? L('Buyers who tapped WhatsApp, call, or survey on one of your listings. Respond fast to convert.', 'Pembeli yang menekan tombol WhatsApp, telepon, atau survei di listing Anda. Respons cepat untuk konversi.') : L('Inbound enquiries auto-captured from contact buttons across the site.', 'Pertanyaan masuk yang tertangkap otomatis dari tombol kontak di seluruh situs.')} actions={<button className="p-btn p-btn-ghost p-btn-sm" onClick={() => downloadFile('assetra-leads.csv', '\uFEFFname,phone,property,source,status,created_at\n' + leads.map(l => `"${l.name || ''}","${l.phone || ''}","${l.listingTitle || ''}",${l.type},${l.status},${new Date(l.createdAt).toISOString()}`).join('\n') + '\n', 'text/csv;charset=utf-8')}><PIcon name="globe" size={14} /> {L('Export', 'Ekspor')}</button>} />
       <Card>
         {leads.length === 0 ? (
           <div style={{ padding: '28px 18px', fontSize: 13, color: 'var(--muted)', textAlign: 'center' }}>{loading ? L('Loading…', 'Memuat…') : L('No leads yet. When visitors tap WhatsApp / Call / Survey on a listing, they appear here.', 'Belum ada prospek. Saat pengunjung menekan WhatsApp / Telepon / Survei pada listing, mereka muncul di sini.')}</div>
