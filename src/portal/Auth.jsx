@@ -24,18 +24,11 @@ const PortalAuth = ({ lang, onNav }) => {
   const [mode, setMode] = React.useState(
     urlVerifyToken ? 'verifying' : urlResetToken ? 'reset' : (pathname === '/register' ? 'register' : 'login'));
 
-  /* Sudah login tapi membuka /auth (tanpa alur token verify/reset) →
-     alihkan ke beranda — KECUALI nomor WA-nya masih menunggu verifikasi. */
+  /* Sudah login tapi membuka /auth (tanpa alur token verify/reset) → alihkan ke beranda. */
   const currentUser = useUser();
-  const needsPhoneVerify = (u) => !!u && !!u.phone && !u.phoneVerified;
   React.useEffect(() => {
     if (currentUser && (mode === 'login' || mode === 'register')) {
-      if (needsPhoneVerify(currentUser)) {
-        setMode('phone');
-        sendOtp();
-      } else {
-        onNav && onNav(currentUser.role === 'admin' ? 'admin' : 'home');
-      }
+      onNav && onNav(currentUser.role === 'admin' ? 'admin' : 'home');
     }
   }, [currentUser, mode]); // eslint-disable-line react-hooks/exhaustive-deps
   const [showPw, setShowPw] = React.useState(false);
@@ -83,10 +76,7 @@ const PortalAuth = ({ lang, onNav }) => {
     api.post('/api/auth/verify-email', { token: urlVerifyToken })
       .then(r => {
         setToken(r.token);
-        /* Nomor WA belum diverifikasi → lanjut ke halaman OTP (reload /auth
-           dengan sesi baru; efek di bawah akan membuka mode 'phone'). */
-        const needsPhone = r.user?.phone && !r.user?.phoneVerified;
-        window.location.replace(needsPhone ? '/auth' : (r.user?.role === 'admin' ? '/admin' : '/'));
+        window.location.replace(r.user?.role === 'admin' ? '/admin' : '/'); // rehidrasi sesi + masuk
       })
       .catch(e => {
         setMode('login');
@@ -97,34 +87,8 @@ const PortalAuth = ({ lang, onNav }) => {
   /* Email ternyata sudah diverifikasi (mis. tautan diklik di tab lain). */
   const [alreadyVerified, setAlreadyVerified] = React.useState(false);
 
-  /* ── Verifikasi nomor WhatsApp (OTP) ── */
+  /* Nomor WhatsApp hanya disimpan sebagai kontak — tidak ada verifikasi OTP. */
   const isValidIndoPhone = (p) => /^(\+62|62|08)[\d\s\-().]{7,15}$/.test(String(p).trim());
-  const [otpCode, setOtpCode] = React.useState('');
-  const [otpPhone, setOtpPhone] = React.useState('');   // nomor tujuan (tampilan)
-  const [otpNewPhone, setOtpNewPhone] = React.useState(''); // input nomor utk akun tanpa nomor (SSO)
-  const sendOtp = async (customPhone) => {
-    if (busy) return;
-    setBusy(true); setError('');
-    try {
-      const r = await api.post('/api/auth/phone/send-otp', customPhone ? { phone: customPhone } : {});
-      if (r?.alreadyVerified) { window.location.replace('/'); return; }
-      setOtpPhone(r.phone || '');
-      setInfo(L(`Code sent via WhatsApp to ${r.phone}.`, `Kode terkirim via WhatsApp ke ${r.phone}.`));
-    } catch (e) {
-      setError(e.message || L('Failed to send code', 'Gagal mengirim kode'));
-    } finally { setBusy(false); }
-  };
-  const verifyOtp = async () => {
-    if (busy || otpCode.trim().length !== 6) return;
-    setBusy(true); setError('');
-    try {
-      const r = await api.post('/api/auth/phone/verify', { code: otpCode.trim() });
-      window.location.replace(r.user?.role === 'admin' ? '/admin' : '/'); // rehidrasi sesi + masuk
-    } catch (e) {
-      setError(e.message || L('Wrong code', 'Kode salah'));
-      setBusy(false);
-    }
-  };
   const resendVerification = async () => {
     if (busy) return;
     setBusy(true); setError(''); setInfo('');
@@ -181,12 +145,6 @@ const PortalAuth = ({ lang, onNav }) => {
       let user;
       if (mode === 'login') {
         user = await actions.login(email, password);
-        /* Gerbang WhatsApp: nomor ada tapi belum diverifikasi → halaman OTP. */
-        if (user.phone && !user.phoneVerified) {
-          setMode('phone');
-          await sendOtp();
-          return;
-        }
       } else {
         if (!isValidIndoPhone(phoneNum)) {
           setError(L('Enter a valid active WhatsApp number (08xx / +62xx)', 'Isi nomor WhatsApp aktif yang valid (08xx / +62xx)'));
@@ -254,13 +212,6 @@ const PortalAuth = ({ lang, onNav }) => {
       const profile = await signInWithGoogle();
       if (!profile) return;
       const user = await actions.googleLogin(profile);
-      /* Akun SSO tanpa nomor / belum verifikasi → tawarkan verifikasi WA
-         (boleh dilewati; SSO tidak mengumpulkan nomor telepon). */
-      if (!user.phoneVerified) {
-        setMode('phone');
-        if (user.phone) await sendOtp();
-        return;
-      }
       onNav && onNav(user.role === 'admin' ? 'admin' : 'home');
     } catch (e) {
       setError(e.message || 'Google sign-in failed');
@@ -326,10 +277,6 @@ const PortalAuth = ({ lang, onNav }) => {
                 }}>{lbl}</button>
               ))}
             </div>
-          ) : mode === 'phone' ? (
-            <a onClick={() => { actions.logout(); goMode('login'); }} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 13, fontWeight: 600, color: 'var(--muted)', cursor: 'pointer', marginBottom: 24 }}>
-              ← {L('Sign out', 'Keluar')}
-            </a>
           ) : (
             <a onClick={() => goMode('login')} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 13, fontWeight: 600, color: 'var(--teal)', cursor: 'pointer', marginBottom: 24 }}>
               ← {L('Back to sign in', 'Kembali ke Masuk')}
@@ -342,7 +289,6 @@ const PortalAuth = ({ lang, onNav }) => {
               : mode === 'forgot' ? L('Reset your password', 'Atur ulang kata sandi')
               : mode === 'pending' ? (alreadyVerified ? L('Email already verified ✅', 'Email sudah terverifikasi ✅') : L('Check your email 📬', 'Cek email Anda 📬'))
               : mode === 'verifying' ? L('Verifying your email…', 'Memverifikasi email Anda…')
-              : mode === 'phone' ? L('Verify your WhatsApp 📱', 'Verifikasi WhatsApp Anda 📱')
               : L('Create a new password', 'Buat kata sandi baru')}
           </h2>
           <p style={{ fontSize: 13.5, color: 'var(--muted)', margin: '0 0 26px', lineHeight: 1.55 }}>
@@ -353,9 +299,6 @@ const PortalAuth = ({ lang, onNav }) => {
                   ? L(`${email} is verified and your account is active. Sign in to continue.`, `${email} sudah terverifikasi dan akun Anda aktif. Silakan masuk untuk melanjutkan.`)
                   : L(`We sent a verification link to ${email}. Click the button in that email to activate your account and sign in.`, `Kami mengirim tautan verifikasi ke ${email}. Klik tombol di email tersebut untuk mengaktifkan akun dan masuk.`))
               : mode === 'verifying' ? L('One moment — activating your account.', 'Sebentar — sedang mengaktifkan akun Anda.')
-              : mode === 'phone' ? ((otpPhone || currentUser?.phone)
-                  ? L(`Enter the 6-digit code sent to ${otpPhone || currentUser?.phone}.`, `Masukkan kode 6 digit yang dikirim ke ${otpPhone || currentUser?.phone}.`)
-                  : L('Add your active WhatsApp number to secure your account.', 'Tambahkan nomor WhatsApp aktif untuk mengamankan akun Anda.'))
               : L(`Setting a new password for ${email}.`, `Membuat kata sandi baru untuk ${email}.`)}
           </p>
 
@@ -435,12 +378,12 @@ const PortalAuth = ({ lang, onNav }) => {
               <div style={field}>
                 <label style={labelS}>{L('Active WhatsApp number *', 'Nomor WhatsApp aktif *')}</label>
                 <input style={inputS} type="tel" inputMode="tel" placeholder="0812 3456 7890" value={phoneNum} onChange={e => setPhoneNum(e.target.value)} />
-                <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>{L('A verification code will be sent to this number.', 'Kode verifikasi akan dikirim ke nomor ini.')}</span>
+                <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>{L('Used so buyers and our team can contact you.', 'Dipakai agar pembeli dan tim kami bisa menghubungi Anda.')}</span>
               </div>
             </>
           )}
 
-          {mode !== 'reset' && mode !== 'pending' && mode !== 'verifying' && mode !== 'phone' && (
+          {mode !== 'reset' && mode !== 'pending' && mode !== 'verifying' && (
             <div style={field}>
               <label style={labelS}>Email</label>
               <input style={inputS} type="email" placeholder="nama@email.com" value={email} onChange={e => setEmail(e.target.value)} onKeyDown={e => mode === 'forgot' && e.key === 'Enter' && submit()} />
@@ -466,52 +409,6 @@ const PortalAuth = ({ lang, onNav }) => {
             <div style={{ textAlign: 'center', padding: '18px 0 26px' }}>
               <div style={{ width: 74, height: 74, borderRadius: '50%', margin: '0 auto', border: '3px solid rgba(26,111,168,0.2)', borderTopColor: 'var(--teal)', animation: 'authspin 0.9s linear infinite' }} />
               <style>{`@keyframes authspin { to { transform: rotate(360deg); } }`}</style>
-            </div>
-          )}
-
-          {/* ── Verifikasi WhatsApp (OTP) ── */}
-          {mode === 'phone' && (
-            <div style={{ marginBottom: 6 }}>
-              {!(otpPhone || currentUser?.phone) ? (
-                /* Akun tanpa nomor (SSO) → minta nomor dulu */
-                <>
-                  <div style={field}>
-                    <label style={labelS}>{L('Active WhatsApp number *', 'Nomor WhatsApp aktif *')}</label>
-                    <input style={inputS} type="tel" inputMode="tel" placeholder="0812 3456 7890" value={otpNewPhone} onChange={e => setOtpNewPhone(e.target.value)} />
-                  </div>
-                  <button className="p-btn p-btn-cyan" disabled={busy || !isValidIndoPhone(otpNewPhone)}
-                    style={{ width: '100%', height: 50, fontSize: 15, borderRadius: 10, justifyContent: 'center', opacity: busy || !isValidIndoPhone(otpNewPhone) ? 0.55 : 1 }}
-                    onClick={() => sendOtp(otpNewPhone.trim())}>
-                    {busy ? L('Sending…', 'Mengirim…') : L('Send verification code', 'Kirim kode verifikasi')} <PIcon name="arrowR" size={16} />
-                  </button>
-                </>
-              ) : (
-                <>
-                  <div style={field}>
-                    <label style={labelS}>{L('6-digit code', 'Kode 6 digit')}</label>
-                    <input
-                      style={{ ...inputS, textAlign: 'center', fontFamily: 'var(--mono)', fontSize: 22, letterSpacing: 10, height: 56 }}
-                      inputMode="numeric" maxLength={6} placeholder="••••••"
-                      value={otpCode}
-                      onChange={e => setOtpCode(e.target.value.replace(/\D/g, ''))}
-                      onKeyDown={e => e.key === 'Enter' && verifyOtp()}
-                    />
-                  </div>
-                  <button className="p-btn p-btn-cyan" disabled={busy || otpCode.length !== 6}
-                    style={{ width: '100%', height: 50, fontSize: 15, borderRadius: 10, justifyContent: 'center', opacity: busy || otpCode.length !== 6 ? 0.55 : 1 }}
-                    onClick={verifyOtp}>
-                    {busy ? L('Verifying…', 'Memverifikasi…') : L('Verify number', 'Verifikasi nomor')} <PIcon name="arrowR" size={16} />
-                  </button>
-                  <div style={{ textAlign: 'center', marginTop: 14 }}>
-                    <a onClick={() => !busy && sendOtp()} style={{ fontSize: 13, fontWeight: 600, color: 'var(--teal)', cursor: 'pointer' }}>{L('Resend code', 'Kirim ulang kode')}</a>
-                  </div>
-                </>
-              )}
-              {currentUser?.provider === 'google' && (
-                <div style={{ textAlign: 'center', marginTop: 14 }}>
-                  <a onClick={() => onNav && onNav(currentUser.role === 'admin' ? 'admin' : 'home')} style={{ fontSize: 12.5, color: 'var(--muted)', cursor: 'pointer' }}>{L('Skip for now', 'Lewati untuk sekarang')}</a>
-                </div>
-              )}
             </div>
           )}
 
@@ -595,7 +492,7 @@ const PortalAuth = ({ lang, onNav }) => {
               </button>
             </>
             )
-          ) : mode !== 'verifying' && mode !== 'phone' && (
+          ) : mode !== 'verifying' && (
           <button className="p-btn p-btn-cyan" disabled={busy} style={{ width: '100%', height: 50, fontSize: 15, borderRadius: 10, justifyContent: 'center', opacity: busy ? 0.6 : 1 }} onClick={submit}>
             {busy
               ? L('Processing…', 'Memproses…')
