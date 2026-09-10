@@ -2,7 +2,7 @@
 import React from 'react';
 import { useT } from '../i18n';
 import { Photo2 } from '../shared-v2';
-import { PIcon, fmtRpFull, PortalNav, PortalFooter, PCard, AdSlot, PLISTINGS } from './shared';
+import { PIcon, fmtRpFull, PortalNav, PortalFooter, PCard, AdSlot, PLISTINGS, usePortalListings } from './shared';
 import { api } from '../api/client';
 import { useUser } from '../store';
 import { useIsMobile } from '../lib/useIsMobile';
@@ -31,7 +31,9 @@ const PortalDetail = ({ lang, onLang, onNav, listing }) => {
   /* Judul & pesan gerbang berbeda: belum masuk vs sudah masuk tapi belum verifikasi. */
   const gateTitle = (idText, enText, verifyId, verifyEn) => gateNeedsVerify ? (lang === 'id' ? verifyId : verifyEn) : (lang === 'id' ? idText : enText);
   const [tab, setTab] = React.useState('overview');
-  const similar = PLISTINGS.filter(x => x.id !== l.id).slice(0, 3);
+  /* Listing serupa dari data asli (bukan set contoh). */
+  const liveListings = usePortalListings();
+  const similar = liveListings.filter(x => String(x.id) !== String(l.id)).slice(0, 3);
 
   /* Foto agen dikelola di back office — cocokkan berdasarkan nama agen listing. */
   const [agentPhoto, setAgentPhoto] = React.useState(null);

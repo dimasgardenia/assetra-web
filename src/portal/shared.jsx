@@ -397,6 +397,9 @@ const AdSlot = ({ variant = 'leaderboard', bank = 'bca', placement, style }) => 
 };
 
 /* ── Data (demo fallback; live data comes from the API) ── */
+/* Listing contoh hanya untuk pengembangan/demo. Di production dimatikan
+   (VITE_DEMO_LISTINGS tidak 'true') agar pengunjung hanya melihat listing asli. */
+const DEMO_LISTINGS_ENABLED = import.meta.env.VITE_DEMO_LISTINGS === 'true';
 const PLISTINGS = [
   { id: 1, title: 'Menteng Heritage Townhouse', addr: 'Menteng, Jakarta Pusat', kind: 'property', mode: 'sale', price: 14_200_000_000, beds: 4, baths: 3, area: 420, photos: 31, agent: 'Dewi Lestari', agentInit: 'DL', agency: 'Ray White Menteng', featured: true, sponsored: true },
   { id: 2, title: 'SCBD Sky Apartment 28F', addr: 'SCBD, Jakarta Selatan', kind: 'apartment', mode: 'sale', price: 5_350_000_000, beds: 3, baths: 2, area: 186, photos: 22, agent: 'Andi Wijaya', agentInit: 'AW', agency: 'Century 21', featured: true },
@@ -487,7 +490,7 @@ function usePortalListings() {
       .catch(() => {}); // backend down → demo data only
     return () => { on = false; };
   }, []);
-  return React.useMemo(() => [...dbListings, ...PLISTINGS], [dbListings]);
+  return React.useMemo(() => DEMO_LISTINGS_ENABLED ? [...dbListings, ...PLISTINGS] : dbListings, [dbListings]);
 }
 
-export { PIcon, CatIcon, fmtRp, fmtRpFull, PortalNav, PortalFooter, PCard, AdSlot, AD_BANKS, PLISTINGS, PCATS, mapApiListing, usePortalListings };
+export { PIcon, CatIcon, fmtRp, fmtRpFull, PortalNav, PortalFooter, PCard, AdSlot, AD_BANKS, PLISTINGS, PCATS, mapApiListing, usePortalListings, DEMO_LISTINGS_ENABLED };

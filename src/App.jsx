@@ -67,23 +67,34 @@ const Settings = withNav(PortalSettings);
 /* Detail needs the listing from route state; on a direct URL / refresh it
    falls back to the demo set, then to the API for DB listings. */
 import { useLocation, useParams } from 'react-router-dom';
-import { PLISTINGS, mapApiListing } from './portal/shared';
+import { PLISTINGS, mapApiListing, DEMO_LISTINGS_ENABLED } from './portal/shared';
 import { api } from './api/client';
 import { Spinner } from './portal/Loading';
 function DetailRoute(props) {
   const { state } = useLocation();
   const { id } = useParams();
-  const known = state?.listing || PLISTINGS.find(l => String(l.id) === String(id)) || null;
+  const known = state?.listing || (DEMO_LISTINGS_ENABLED ? PLISTINGS.find(l => String(l.id) === String(id)) : null) || null;
   const [fetched, setFetched] = React.useState(null);
+  const [notFound, setNotFound] = React.useState(false);
   React.useEffect(() => {
-    if (known || !id) return;
+    if (known || !id) { if (!id) setNotFound(true); return; }
     let on = true;
+    setNotFound(false);
     api.get(`/api/listings/${encodeURIComponent(id)}`)
-      .then(r => { if (on && r?.data) setFetched(mapApiListing(r.data)); })
-      .catch(() => {});
+      .then(r => { if (on && r?.data) setFetched(mapApiListing(r.data)); else if (on) setNotFound(true); })
+      .catch(() => { if (on) setNotFound(true); });
     return () => { on = false; };
   }, [id]);
   const listing = known || fetched;
+  if (!listing && notFound) {
+    return (
+      <div style={{ minHeight: '60vh', display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: 24, fontFamily: 'var(--sans, sans-serif)' }}>
+        <div style={{ fontFamily: 'var(--serif, Georgia)', fontSize: 26, color: 'var(--ink, #0A1640)' }}>Listing tidak ditemukan</div>
+        <div style={{ color: 'var(--muted, #667)', fontSize: 14, maxWidth: 360, lineHeight: 1.6 }}>Listing ini mungkin sudah dihapus atau tautannya salah.</div>
+        <a href="/search" style={{ textDecoration: 'none' }}><button className="p-btn p-btn-cyan">Lihat listing lain</button></a>
+      </div>
+    );
+  }
   if (!listing) {
     return (
       <div style={{ minHeight: '60vh', display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center', justifyContent: 'center', color: 'var(--muted, #667)', fontFamily: 'var(--sans, sans-serif)', fontSize: 14 }}>
