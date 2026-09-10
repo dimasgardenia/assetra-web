@@ -10,6 +10,7 @@ import { PIcon, fmtRp } from './shared';
 import { api, resolveFileUrl } from '../api/client';
 import { resizeToAvatarDataUrl } from '../lib/image';
 import AppDialog from './AppDialog';
+import { useUser } from '../store';
 
 /* Admin form type → backend {type, mode} */
 const TY_MAP = {
@@ -39,7 +40,14 @@ async function apiAdmin(fn) {
 const PortalAdmin = ({ lang, onLang, onNav }) => {
   const id = lang === 'id';
   const L = (en, idt) => (id ? idt : en);
-  const [persona, setPersona] = React.useState('admin');
+  /* Persona mengikuti akun yang login: admin → semua menu; selain itu (agen
+     terverifikasi yang lolos AdminGuard) → menu agen. Hanya admin yang boleh
+     "melihat sebagai" persona lain. */
+  const user = useUser();
+  const isAdmin = user?.role === 'admin';
+  const realPersona = isAdmin ? 'admin' : 'agent';
+  const [persona, setPersona] = React.useState(realPersona);
+  React.useEffect(() => { if (!isAdmin && persona !== 'agent') { setPersona('agent'); setNav('mylistings'); } }, [isAdmin]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* Badge sidebar dari data nyata (bukan angka statis). */
   const [counts, setCounts] = React.useState(null);
@@ -71,8 +79,9 @@ const PortalAdmin = ({ lang, onLang, onNav }) => {
       { id: 'reports',   label: L('Reports', 'Laporan'), icon: 'doc' },
     ],
     agent: [
-      { id: 'leads', label: L('Leads', 'Prospek'), icon: 'users', count: 23 },
-      { id: 'kpr',   label: L('KPR Applications', 'Pengajuan KPR'), icon: 'bank', count: 6 },
+      { id: 'mylistings', label: L('My Listings', 'Listing Saya'), icon: 'home' },
+      { id: 'leads', label: L('Leads', 'Prospek'), icon: 'users' },
+      { id: 'kpr',   label: L('KPR Applications', 'Pengajuan KPR'), icon: 'bank' },
       { id: 'ai',    label: L('AI Reports', 'Laporan AI'), icon: 'sparkle' },
       { id: 'agents',label: L('Agents', 'Agen'), icon: 'users' },
     ],
@@ -85,11 +94,15 @@ const PortalAdmin = ({ lang, onLang, onNav }) => {
     ],
   };
 
-  const defaultNav = { admin: 'dashboard', agent: 'leads', owner: 'mylistings' };
-  const [nav, setNav] = React.useState(defaultNav.admin);
+  const defaultNav = { admin: 'dashboard', agent: 'mylistings', owner: 'mylistings' };
+  const [nav, setNav] = React.useState(defaultNav[realPersona]);
   const switchPersona = (p) => { setPersona(p); setNav(defaultNav[p]); };
 
-  const cur = PERSONAS[persona];
+  /* Nama & inisial dari akun asli bila persona = peran sebenarnya. */
+  const realName = user?.name || user?.email || '';
+  const cur = persona === realPersona && realName
+    ? { ...PERSONAS[persona], name: realName, init: realName.trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase() }
+    : PERSONAS[persona];
   /* Timpa badge statis dengan hitungan nyata bila sudah termuat. */
   const navItems = NAV[persona].map(n => (counts && counts[n.id] != null ? { ...n, count: counts[n.id] } : n));
 
@@ -108,14 +121,16 @@ const PortalAdmin = ({ lang, onLang, onNav }) => {
           </div>
         ))}
 
-        {/* role switcher (demo) */}
+        {/* role switcher — hanya admin yang boleh melihat sebagai persona lain */}
         <div style={{ marginTop: 'auto', padding: '14px 18px', borderTop: '1px solid rgba(250,250,247,0.08)' }}>
+          {isAdmin && (<>
           <div style={{ fontFamily: 'var(--mono)', fontSize: 8, letterSpacing: '0.12em', color: 'rgba(250,250,247,0.4)', marginBottom: 8 }}>{L('VIEW AS PERSONA', 'LIHAT SEBAGAI')}</div>
           <div style={{ display: 'flex', gap: 4, marginBottom: 14 }}>
             {Object.keys(PERSONAS).map(p => (
               <button key={p} onClick={() => switchPersona(p)} style={{ flex: 1, padding: '6px 0', fontFamily: 'var(--mono)', fontSize: 9, letterSpacing: '0.06em', borderRadius: 4, cursor: 'pointer', border: '1px solid ' + (persona === p ? PERSONAS[p].badge : 'rgba(250,250,247,0.15)'), background: persona === p ? PERSONAS[p].badge : 'transparent', color: persona === p ? '#fff' : 'rgba(250,250,247,0.6)', fontWeight: 600 }}>{PERSONAS[p].tag}</button>
             ))}
           </div>
+          </>)}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ width: 30, height: 30, borderRadius: '50%', background: cur.badge, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--mono)', fontSize: 11, fontWeight: 600 }}>{cur.init}</div>
             <div style={{ minWidth: 0 }}><div style={{ fontSize: 12, fontWeight: 600, color: '#fff' }}>{cur.name}</div><div style={{ fontFamily: 'var(--mono)', fontSize: 9, color: 'rgba(250,250,247,0.5)', letterSpacing: '0.04em' }}>{cur.role.toUpperCase()}</div></div>
@@ -135,7 +150,7 @@ const PortalAdmin = ({ lang, onLang, onNav }) => {
         <div style={{ padding: 28, overflowY: 'auto' }}>
           {nav === 'dashboard' && <AdmDash L={L} />}
           {nav === 'listings' && <AdmListings L={L} scope="all" persona={persona} onGoBulk={() => setNav('bulk')} />}
-          {nav === 'mylistings' && <AdmListings L={L} scope="owner" persona={persona} onGoBulk={() => setNav('bulk')} />}
+          {nav === 'mylistings' && <AdmListings L={L} scope={persona === 'owner' ? 'owner' : 'mine'} persona={persona} me={user} onGoBulk={() => setNav('bulk')} />}
           {nav === 'ownerads' && <AdmOwnerAds L={L} />}
           {nav === 'reports' && <AdmReports L={L} persona={persona} />}
           {nav === 'bulk' && <AdmBulk L={L} />}
@@ -446,8 +461,12 @@ const ListingModal = ({ L, mode, initial, lockOwner, onClose, onSave }) => {
   );
 };
 
-const AdmListings = ({ L, scope, persona, onGoBulk }) => {
-  const [items, setItems] = React.useState(() => ([
+const AdmListings = ({ L, scope, persona, me, onGoBulk }) => {
+  /* scope: 'all' (admin) | 'owner' (persona demo) | 'mine' (agen: hanya listing
+     yang ia buat, dari database — tanpa baris contoh). */
+  const mine = scope === 'mine';
+  const myName = me?.name || me?.email || '';
+  const [items, setItems] = React.useState(() => mine ? [] : ([
     { id: 'P-0847', t: 'Menteng Heritage Townhouse', ty: 'House · Sale', price: 14_200_000_000, owner: 'Siti Rahayu', views: '12.4K', leads: 42, promo: 'Sponsored', st: 'live' },
     { id: 'P-0823', t: 'SCBD Sky Apartment 28F', ty: 'Apartment · Sale', price: 5_350_000_000, owner: 'Andi Wijaya', views: '8.1K', leads: 28, promo: 'Featured', st: 'live' },
     { id: 'P-0801', t: 'Canggu Beachfront Villa', ty: 'Villa · Sale', price: 12_000_000_000, owner: 'Putu Surya', views: '18.9K', leads: 61, promo: 'Sponsored', st: 'live' },
@@ -468,6 +487,7 @@ const AdmListings = ({ L, scope, persona, onGoBulk }) => {
     { k: 'draft', label: 'Draft' },
   ];
   const scoped = scope === 'owner' ? items.filter(l => l.owner === 'Siti Rahayu') : items;
+  const showOwnerCol = scope === 'all';
   const rows = scoped.filter(l =>
     chip === 'all' ? true
     : chip === 'featured' ? (l.promo === 'Featured' || l.promo === 'Sponsored')
@@ -480,13 +500,13 @@ const AdmListings = ({ L, scope, persona, onGoBulk }) => {
   const openRow = (mode, id) => setModal({ mode, id });
   const current = modal?.id != null ? items.find(l => l.id === modal.id) : null;
   const initialForm = modal?.mode === 'new'
-    ? { t: '', ty: LISTING_TYPES[0], price: '', addr: '', beds: '', baths: '', area: '', bldArea: '', floors: '', year: '', cert: '', desc: '', fac: '', owner: scope === 'owner' ? 'Siti Rahayu' : '', promo: '—', st: 'live' }
+    ? { t: '', ty: LISTING_TYPES[0], price: '', addr: '', beds: '', baths: '', area: '', bldArea: '', floors: '', year: '', cert: '', desc: '', fac: '', owner: scope === 'owner' ? 'Siti Rahayu' : mine ? myName : '', promo: '—', st: 'live' }
     : current ? { ...current, price: String(current.price) } : null;
 
   /* Load marketplace listings from the database so they survive refresh. */
   React.useEffect(() => {
     let on = true;
-    api.get('/api/listings?source=portal&perPage=60').then(r => {
+    api.get('/api/listings?source=portal&perPage=60' + (mine ? '&mine=1' : '')).then(r => {
       if (!on) return;
       const rows = (r.data || []).map(x => ({
         id: x.id, t: x.title, ty: x.typeLabel || x.type, price: x.price ?? x.currentBid ?? 0,
@@ -502,7 +522,7 @@ const AdmListings = ({ L, scope, persona, onGoBulk }) => {
       setItems(q => [...rows, ...q.filter(i => !rows.some(r2 => r2.id === i.id))]);
     }).catch(() => {}); // backend down → demo rows only
     return () => { on = false; };
-  }, []);
+  }, [mine]);
 
   const saveModal = async (f) => {
     const nPhoto = f.photos?.length || 0;
@@ -583,10 +603,11 @@ const AdmListings = ({ L, scope, persona, onGoBulk }) => {
         </div>
       )}
       <PageHead
-        title={scope === 'owner' ? L('My Listings', 'Listing Saya') : L('Listings & Ad Management', 'Manajemen Listing & Iklan')}
-        sub={scope === 'owner' ? L('Manage your own properties. Bulk upload to publish many at once.', 'Kelola properti Anda. Unggah massal untuk publikasi sekaligus.') : L('All inventory, sponsored placements, and revenue.', 'Semua inventori, placement sponsor, dan pendapatan.')}
+        title={scope === 'owner' || mine ? L('My Listings', 'Listing Saya') : L('Listings & Ad Management', 'Manajemen Listing & Iklan')}
+        sub={mine ? L('Properties you listed. New listings go live on the public site immediately.', 'Properti yang Anda pasang. Listing baru langsung tayang di situs publik.')
+          : scope === 'owner' ? L('Manage your own properties. Bulk upload to publish many at once.', 'Kelola properti Anda. Unggah massal untuk publikasi sekaligus.') : L('All inventory, sponsored placements, and revenue.', 'Semua inventori, placement sponsor, dan pendapatan.')}
         actions={<>
-          <button className="p-btn p-btn-ghost p-btn-sm" onClick={onGoBulk}><PIcon name="doc" size={14} /> {L('Bulk upload', 'Unggah massal')}</button>
+          {!mine && <button className="p-btn p-btn-ghost p-btn-sm" onClick={onGoBulk}><PIcon name="doc" size={14} /> {L('Bulk upload', 'Unggah massal')}</button>}
           <button className="p-btn p-btn-primary p-btn-sm" onClick={openNew}><PIcon name="plus" size={14} /> {L('New listing', 'Listing baru')}</button>
         </>}
       />
@@ -606,7 +627,7 @@ const AdmListings = ({ L, scope, persona, onGoBulk }) => {
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead><tr style={{ background: 'var(--paper-2)' }}>
             <Th>ID</Th><Th>{L('Property', 'Properti')}</Th><Th>{L('Price', 'Harga')}</Th>
-            {scope !== 'owner' && <Th>{L('Owner', 'Pemilik')}</Th>}
+            {showOwnerCol && <Th>{L('Owner', 'Pemilik')}</Th>}
             <Th right>Views</Th><Th right>{L('Leads', 'Prospek')}</Th><Th>Promo</Th><Th>Status</Th><Th> </Th>
           </tr></thead>
           <tbody>
@@ -615,7 +636,7 @@ const AdmListings = ({ L, scope, persona, onGoBulk }) => {
                 <Td mono>{l.id}</Td>
                 <Td><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><div style={{ width: 36, height: 36, borderRadius: 6, overflow: 'hidden', flexShrink: 0 }}>{l.photos && l.photos.length ? <img src={l.photos[0].url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} /> : <Photo2 kind={kindFor(l.ty)} seed={l.id} w={100} />}</div><div><div style={{ fontWeight: 600 }}>{l.t}</div><div style={{ fontSize: 11, color: 'var(--muted)' }}>{l.ty}</div></div></div></Td>
                 <Td mono bold>{fmtRp(l.price)}</Td>
-                {scope !== 'owner' && <Td>{l.owner}</Td>}
+                {showOwnerCol && <Td>{l.owner}</Td>}
                 <Td right mono>{l.views}</Td>
                 <Td right mono bold>{l.leads}</Td>
                 <Td>{l.promo === '—' ? <span style={{ color: 'var(--muted)' }}>—</span> : <span style={{ fontFamily: 'var(--mono)', fontSize: 10, letterSpacing: '0.06em', padding: '3px 8px', borderRadius: 4, background: l.promo === 'Sponsored' ? 'rgba(26,111,168,0.1)' : 'rgba(176,136,56,0.12)', color: l.promo === 'Sponsored' ? 'var(--teal)' : 'var(--gold-2)' }}>{l.promo === 'Sponsored' ? '★ ' : ''}{l.promo}</span>}</Td>
@@ -630,14 +651,14 @@ const AdmListings = ({ L, scope, persona, onGoBulk }) => {
             ))}
             {rows.length === 0 && (
               <tr style={{ borderTop: '1px solid var(--line)' }}>
-                <td colSpan={scope !== 'owner' ? 9 : 8} style={{ padding: '22px 18px', textAlign: 'center', fontSize: 12.5, color: 'var(--muted)' }}>{L('No listings match this filter.', 'Tidak ada listing untuk filter ini.')}</td>
+                <td colSpan={showOwnerCol ? 9 : 8} style={{ padding: '22px 18px', textAlign: 'center', fontSize: 12.5, color: 'var(--muted)' }}>{mine && !items.length ? L('You have no listings yet — tap "New listing" to publish your first property.', 'Anda belum punya listing — tekan "Listing baru" untuk memasang properti pertama.') : L('No listings match this filter.', 'Tidak ada listing untuk filter ini.')}</td>
               </tr>
             )}
           </tbody>
         </table>
       </Card>
       {modal && initialForm && (
-        <ListingModal L={L} mode={modal.mode} initial={initialForm} lockOwner={scope === 'owner'} onClose={() => setModal(null)} onSave={saveModal} />
+        <ListingModal L={L} mode={modal.mode} initial={initialForm} lockOwner={scope === 'owner' || mine} onClose={() => setModal(null)} onSave={saveModal} />
       )}
     </>
   );
