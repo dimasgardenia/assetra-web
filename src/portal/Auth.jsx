@@ -67,22 +67,23 @@ const PortalAuth = ({ lang, onNav }) => {
 
   /* Verifikasi email: tautan /auth?verify=<token> diklik dari kotak masuk.
      Sukses → simpan sesi lalu masuk ke situs (reload agar store terhidrasi). */
-  /* Guard useRef: StrictMode (dev) menjalankan efek dua kali — tanpa guard,
-     panggilan kedua memakai token yang sudah hangus dan menimpa hasil sukses. */
-  const verifyFired = React.useRef(false);
-  React.useEffect(() => {
-    if (!urlVerifyToken || verifyFired.current) return;
-    verifyFired.current = true;
-    api.post('/api/auth/verify-email', { token: urlVerifyToken })
-      .then(r => {
-        setToken(r.token);
-        window.location.replace(r.user?.role === 'admin' ? '/admin' : '/'); // rehidrasi sesi + masuk
-      })
-      .catch(e => {
-        setMode('login');
-        setError(e.message || L('Verification link is invalid or expired', 'Tautan verifikasi tidak valid atau kedaluwarsa'));
-      });
-  }, [urlVerifyToken]); // eslint-disable-line react-hooks/exhaustive-deps
+  /* Aktivasi TIDAK otomatis saat halaman dibuka: aplikasi email & pemindai
+     keamanan sering membuka tautan di latar belakang, sehingga akun bisa
+     "terverifikasi" tanpa pemiliknya mengklik. Butuh satu klik tombol di sini. */
+  const [verifying, setVerifying] = React.useState(false);
+  const activateAccount = async () => {
+    if (!urlVerifyToken || verifying) return;
+    setVerifying(true); setError('');
+    try {
+      const r = await api.post('/api/auth/verify-email', { token: urlVerifyToken });
+      setToken(r.token);
+      window.location.replace(r.user?.role === 'admin' ? '/admin' : '/'); // rehidrasi sesi + masuk
+    } catch (e) {
+      setVerifying(false);
+      setMode('login');
+      setError(e.message || L('Verification link is invalid or expired', 'Tautan verifikasi tidak valid atau kedaluwarsa'));
+    }
+  };
 
   /* Email ternyata sudah diverifikasi (mis. tautan diklik di tab lain). */
   const [alreadyVerified, setAlreadyVerified] = React.useState(false);
@@ -288,7 +289,7 @@ const PortalAuth = ({ lang, onNav }) => {
               : mode === 'register' ? L('Join Assetra', 'Bergabung dengan Assetra')
               : mode === 'forgot' ? L('Reset your password', 'Atur ulang kata sandi')
               : mode === 'pending' ? (alreadyVerified ? L('Email already verified ✅', 'Email sudah terverifikasi ✅') : L('Check your email 📬', 'Cek email Anda 📬'))
-              : mode === 'verifying' ? L('Verifying your email…', 'Memverifikasi email Anda…')
+              : mode === 'verifying' ? L('Activate your account', 'Aktifkan akun Anda')
               : L('Create a new password', 'Buat kata sandi baru')}
           </h2>
           <p style={{ fontSize: 13.5, color: 'var(--muted)', margin: '0 0 26px', lineHeight: 1.55 }}>
@@ -298,7 +299,7 @@ const PortalAuth = ({ lang, onNav }) => {
               : mode === 'pending' ? (alreadyVerified
                   ? L(`${email} is verified and your account is active. Sign in to continue.`, `${email} sudah terverifikasi dan akun Anda aktif. Silakan masuk untuk melanjutkan.`)
                   : L(`We sent a verification link to ${email}. Click the button in that email to activate your account and sign in.`, `Kami mengirim tautan verifikasi ke ${email}. Klik tombol di email tersebut untuk mengaktifkan akun dan masuk.`))
-              : mode === 'verifying' ? L('One moment — activating your account.', 'Sebentar — sedang mengaktifkan akun Anda.')
+              : mode === 'verifying' ? L(`Press the button below to confirm ${email || 'your email'} and sign in.`, `Tekan tombol di bawah untuk mengonfirmasi ${email || 'email Anda'} dan masuk.`)
               : L(`Setting a new password for ${email}.`, `Membuat kata sandi baru untuk ${email}.`)}
           </p>
 
@@ -406,9 +407,15 @@ const PortalAuth = ({ lang, onNav }) => {
             </div>
           )}
           {mode === 'verifying' && (
-            <div style={{ textAlign: 'center', padding: '18px 0 26px' }}>
-              <div style={{ width: 74, height: 74, borderRadius: '50%', margin: '0 auto', border: '3px solid rgba(26,111,168,0.2)', borderTopColor: 'var(--teal)', animation: 'authspin 0.9s linear infinite' }} />
-              <style>{`@keyframes authspin { to { transform: rotate(360deg); } }`}</style>
+            <div style={{ textAlign: 'center', padding: '6px 0 22px' }}>
+              <div style={{ width: 74, height: 74, borderRadius: '50%', margin: '0 auto 18px', background: 'rgba(59,196,217,0.12)', border: '1px solid rgba(59,196,217,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32 }}>✉️</div>
+              <button type="button" onClick={activateAccount} disabled={verifying}
+                style={{ width: '100%', padding: '13px 16px', borderRadius: 10, border: 'none', cursor: verifying ? 'wait' : 'pointer', background: 'var(--ink)', color: '#fff', fontSize: 15, fontWeight: 600, fontFamily: 'inherit', opacity: verifying ? 0.7 : 1 }}>
+                {verifying ? L('Activating…', 'Mengaktifkan…') : L('Activate account & sign in', 'Aktifkan akun & masuk')}
+              </button>
+              <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 12, lineHeight: 1.5 }}>
+                {L('This link works once and expires in 24 hours.', 'Tautan ini hanya berlaku sekali dan kedaluwarsa dalam 24 jam.')}
+              </div>
             </div>
           )}
 
