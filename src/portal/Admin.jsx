@@ -52,6 +52,7 @@ const PortalAdmin = ({ lang, onLang, onNav }) => {
   /* Badge sidebar dari data nyata (bukan angka statis). */
   const [counts, setCounts] = React.useState(null);
   React.useEffect(() => {
+    if (!isAdmin) return; // statistik hanya untuk admin (endpoint menolak peran lain)
     apiAdmin(() => adminApi.get('/api/admin/stats'))
       .then(r => {
         const s = r.data || {};
