@@ -197,7 +197,11 @@ const PortalFooter = () => {
         <div className="p-footer-col"><h4>{t('p.foot.company')}</h4>
           <a>{t('p.foot.about')}</a><a>{t('p.foot.careers')}</a><a>{t('p.foot.press')}</a><a>{t('p.foot.contact')}</a></div>
       </div>
-      <div className="p-footer-bottom"><span>{t('p.foot.legal')}</span></div>
+      <div className="p-footer-bottom" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 18px', alignItems: 'center' }}>
+        <span>{t('p.foot.legal')}</span>
+        <a href="/privacy" style={{ color: 'inherit', textDecoration: 'underline', cursor: 'pointer' }}>{t('p.foot.privacy')}</a>
+        <a href="/terms" style={{ color: 'inherit', textDecoration: 'underline', cursor: 'pointer' }}>{t('p.foot.terms')}</a>
+      </div>
     </div></footer>
   );
 };

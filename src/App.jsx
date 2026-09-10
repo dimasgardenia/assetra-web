@@ -15,6 +15,7 @@ import PortalAdvertise from './portal/Advertise';
 import PortalAuth from './portal/Auth';
 import PortalAdmin from './portal/Admin';
 import PortalSettings from './portal/Settings';
+import { PortalPrivacy, PortalTerms } from './portal/Legal';
 
 /* Maps the design's onNav(id) convention onto React Router paths. */
 const NAV_MAP = {
@@ -31,6 +32,8 @@ const NAV_MAP = {
   sell: '/auth',
   admin: '/admin',
   settings: '/settings',
+  privacy: '/privacy',
+  terms: '/terms',
 };
 
 function withNav(Component) {
@@ -55,6 +58,8 @@ function withNav(Component) {
 }
 
 const Home = withNav(PortalHome);
+const Privacy = withNav(PortalPrivacy);
+const Terms = withNav(PortalTerms);
 const Search = withNav(PortalSearch);
 const Detail = withNav(PortalDetail);
 const Finance = withNav(PortalFinance);
@@ -164,6 +169,8 @@ export default function App() {
           <Route path="/signin" element={<Auth {...props} />} />
           <Route path="/register" element={<Auth {...props} />} />
           <Route path="/settings" element={<Settings {...props} />} />
+          <Route path="/privacy" element={<Privacy {...props} />} />
+          <Route path="/terms" element={<Terms {...props} />} />
           <Route path="/admin/*" element={<AdminGuard {...props} />} />
           <Route path="*" element={<Home {...props} />} />
         </Routes>

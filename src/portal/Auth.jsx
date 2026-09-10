@@ -463,9 +463,9 @@ const PortalAuth = ({ lang, onNav }) => {
           ) : (
             <p style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.55, margin: '0 0 22px' }}>
               {L('By creating an account you agree to Assetra’s ', 'Dengan membuat akun, Anda menyetujui ')}
-              <a style={{ color: 'var(--teal)', fontWeight: 600, cursor: 'pointer' }}>{L('Terms', 'Ketentuan')}</a>
+              <a href="/terms" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--teal)', fontWeight: 600, cursor: 'pointer' }}>{L('Terms', 'Ketentuan')}</a>
               {' '}{L('and', 'dan')}{' '}
-              <a style={{ color: 'var(--teal)', fontWeight: 600, cursor: 'pointer' }}>{L('Privacy Policy', 'Kebijakan Privasi')}</a>.
+              <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--teal)', fontWeight: 600, cursor: 'pointer' }}>{L('Privacy Policy', 'Kebijakan Privasi')}</a>.
             </p>
           )}
 
